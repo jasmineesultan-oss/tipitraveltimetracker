@@ -3,7 +3,6 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
-import path from "path";
 import { config } from "./config";
 import { errorHandler } from "./middleware/errorHandler";
 
@@ -32,8 +31,6 @@ app.use(express.urlencoded({ extended: true }));
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 50, standardHeaders: true, legacyHeaders: false });
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/forgot-password", authLimiter);
-
-app.use("/uploads", express.static(path.resolve(process.cwd(), config.uploadDir)));
 
 app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
 

@@ -5,7 +5,7 @@ import { requireAuth, requireRole } from "../middleware/auth";
 import { asyncHandler, ApiError } from "../middleware/errorHandler";
 import { logAudit } from "../services/auditLog.service";
 import { notify, notifyAllAdmins } from "../services/notification.service";
-import { upload } from "../lib/upload";
+import { upload, uploadToBlob } from "../lib/upload";
 import { startOfDayUTC, isWeekend, findHolidayForDate } from "../services/attendance.service";
 
 const router = Router();
@@ -106,6 +106,8 @@ router.post(
       throw new ApiError(400, `${leaveType.name} requires a supporting attachment`);
     }
 
+    const attachmentUrl = req.file ? await uploadToBlob(req.file) : undefined;
+
     const leaveRequest = await prisma.leaveRequest.create({
       data: {
         employeeId,
@@ -114,7 +116,7 @@ router.post(
         endDate,
         totalDays,
         reason: data.reason,
-        attachmentUrl: req.file ? `/uploads/${req.file.filename}` : undefined,
+        attachmentUrl,
         isPlanned: data.isPlanned || false,
         status: "PENDING",
       },

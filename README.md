@@ -43,6 +43,20 @@ npm install
 npm run dev                 # http://localhost:5173 (proxies /api to :4000)
 ```
 
+## Deploying the API to Vercel
+
+`server/` can be deployed as Vercel serverless functions:
+
+- `server/api/index.ts` re-exports the Express `app` as the default export, and
+  `server/vercel.json` rewrites every request to that function.
+- Set `DATABASE_URL` (pooled connection, e.g. Neon's pooled URL) and `DIRECT_URL`
+  (direct, non-pooled connection) so `prisma migrate` can run correctly against a
+  pooled Postgres provider.
+- Set `BLOB_READ_WRITE_TOKEN` (from a Vercel Blob store) — leave request attachments
+  are uploaded to Vercel Blob instead of local disk, since the serverless filesystem
+  isn't persistent.
+- `postinstall` runs `prisma generate` automatically during Vercel's build.
+
 ## Feature Coverage
 
 Implemented: authentication (login, forgot/reset password, change password, remember me), RBAC (Admin/Employee), employee/department/position management, time in/out with automatic late/undertime/overtime/half-day computation, Philippine holiday detection and tagging (regular/special non-working/special working/local) with admin CRUD + fixed-holiday yearly sync, leave management (submission with attachments, approval/rejection/cancellation workflow, balances, planned-leave calendar), admin and employee dashboards with charts, attendance and leave calendars, reports (daily/weekly/monthly/yearly/department/employee/late/undertime/absent/leave/holiday/working-hours/overtime/payroll-summary) exportable to CSV/Excel/PDF, in-app notifications, and audit logging.

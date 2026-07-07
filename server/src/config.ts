@@ -8,5 +8,4 @@ export const config = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "8h",
   jwtRememberExpiresIn: process.env.JWT_REMEMBER_EXPIRES_IN || "30d",
   clientUrl: process.env.CLIENT_URL || "http://localhost:5173",
-  uploadDir: process.env.UPLOAD_DIR || "uploads",
 };
