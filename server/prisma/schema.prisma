@@ -1,0 +1,289 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EMPLOYEE
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  TERMINATED
+  ON_LEAVE
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  HALF_DAY
+  ON_LEAVE
+  HOLIDAY
+  WEEKEND
+}
+
+enum HolidayType {
+  REGULAR
+  SPECIAL_NON_WORKING
+  SPECIAL_WORKING
+  LOCAL
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum NotificationType {
+  LEAVE_APPROVED
+  LEAVE_REJECTED
+  LEAVE_SUBMITTED
+  HOLIDAY_TOMORROW
+  MISSING_TIME_OUT
+  LATE_TODAY
+  ATTENDANCE_ANOMALY
+  GENERAL
+}
+
+enum AuditAction {
+  LOGIN
+  LOGOUT
+  TIME_IN
+  TIME_OUT
+  LEAVE_SUBMITTED
+  LEAVE_APPROVED
+  LEAVE_REJECTED
+  LEAVE_CANCELLED
+  PROFILE_UPDATED
+  PASSWORD_CHANGED
+  PASSWORD_RESET
+  ADMIN_ACTION
+}
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  passwordHash      String
+  role              Role      @default(EMPLOYEE)
+  isActive          Boolean   @default(true)
+  lastLogin         DateTime?
+  resetToken        String?
+  resetTokenExpiry  DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  employee          Employee?
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+
+  @@map("users")
+}
+
+model Department {
+  id          String     @id @default(uuid())
+  name        String     @unique
+  code        String     @unique
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  positions   Position[]
+  employees   Employee[]
+
+  @@map("departments")
+}
+
+model Position {
+  id           String      @id @default(uuid())
+  title        String
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  employees    Employee[]
+
+  @@map("positions")
+}
+
+model Employee {
+  id              String         @id @default(uuid())
+  employeeCode    String         @unique
+  userId          String         @unique
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName       String
+  lastName        String
+  email           String
+  phone           String?
+  departmentId    String?
+  department      Department?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  positionId      String?
+  position        Position?      @relation(fields: [positionId], references: [id], onDelete: SetNull)
+  hireDate        DateTime?
+  status          EmployeeStatus @default(ACTIVE)
+  managerId       String?
+  manager         Employee?      @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
+  subordinates    Employee[]     @relation("EmployeeManager")
+  profilePicture  String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  attendances     Attendance[]
+  leaveRequests   LeaveRequest[]
+  leaveBalances   LeaveBalance[]
+  approvedLeaves  LeaveRequest[] @relation("ApprovedBy")
+
+  @@map("employees")
+}
+
+model Holiday {
+  id                 String      @id @default(uuid())
+  name               String
+  date               DateTime
+  type               HolidayType
+  payClassification  String
+  province            String?
+  isActive           Boolean     @default(true)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  attendances        Attendance[]
+
+  @@unique([name, date])
+  @@map("holidays")
+}
+
+model Attendance {
+  id                  String            @id @default(uuid())
+  employeeId          String
+  employee            Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date                DateTime
+  timeIn              DateTime?
+  timeOut              DateTime?
+  ipAddress           String?
+  device              String?
+  browser             String?
+  gpsLat              Float?
+  gpsLng              Float?
+  status              AttendanceStatus  @default(PRESENT)
+  lateMinutes         Int               @default(0)
+  undertimeMinutes    Int               @default(0)
+  overtimeMinutes     Int               @default(0)
+  totalHours          Float             @default(0)
+  breakHours          Float             @default(0)
+  isWeekend           Boolean           @default(false)
+  holidayId           String?
+  holiday             Holiday?          @relation(fields: [holidayId], references: [id], onDelete: SetNull)
+  holidayType         HolidayType?
+  holidayName         String?
+  holidayPayClass     String?
+  notes               String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@unique([employeeId, date])
+  @@map("attendance")
+}
+
+model LeaveTypeModel {
+  id                  String   @id @default(uuid())
+  name                String   @unique
+  code                String   @unique
+  defaultDays         Int      @default(0)
+  requiresAttachment  Boolean  @default(false)
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  leaveRequests       LeaveRequest[]
+  leaveBalances       LeaveBalance[]
+
+  @@map("leave_types")
+}
+
+model LeaveBalance {
+  id             String         @id @default(uuid())
+  employeeId     String
+  employee       Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveTypeId    String
+  leaveType      LeaveTypeModel @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+  year           Int
+  allocatedDays  Float          @default(0)
+  usedDays       Float          @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([employeeId, leaveTypeId, year])
+  @@map("leave_balances")
+}
+
+model LeaveRequest {
+  id               String         @id @default(uuid())
+  employeeId       String
+  employee         Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveTypeId      String
+  leaveType        LeaveTypeModel @relation(fields: [leaveTypeId], references: [id])
+  startDate        DateTime
+  endDate          DateTime
+  totalDays        Float
+  reason           String
+  attachmentUrl    String?
+  status           LeaveStatus    @default(PENDING)
+  isPlanned        Boolean        @default(false)
+  approvedById     String?
+  approvedBy       Employee?      @relation("ApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt       DateTime?
+  rejectionReason  String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@map("leave_requests")
+}
+
+model Notification {
+  id                String            @id @default(uuid())
+  userId            String
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type              NotificationType
+  title             String
+  message           String
+  isRead            Boolean           @default(false)
+  relatedEntityType String?
+  relatedEntityId   String?
+  createdAt         DateTime          @default(now())
+
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  userId     String?
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     AuditAction
+  entityType String?
+  entityId   String?
+  details    String?
+  ipAddress  String?
+  createdAt  DateTime    @default(now())
+
+  @@map("audit_logs")
+}
+
+model Setting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("settings")
+}
