@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { AttendanceCalendar } from "@/components/shared/AttendanceCalendar";
 import { PageSpinner } from "@/components/shared/Spinner";
 import { formatDate, formatTime, formatMinutes } from "@/lib/utils";
-import { attendanceStatusVariant } from "@/lib/statusStyles";
+import { attendanceStatusVariant, workTypeLabel, workTypeVariant } from "@/lib/statusStyles";
 
 export default function MyAttendancePage() {
   const { user } = useAuth();
@@ -47,6 +47,7 @@ export default function MyAttendancePage() {
                   <TableHead>Time In</TableHead>
                   <TableHead>Time Out</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Work Type</TableHead>
                   <TableHead>Late</TableHead>
                   <TableHead>Undertime</TableHead>
                   <TableHead>Overtime</TableHead>
@@ -57,11 +58,19 @@ export default function MyAttendancePage() {
               <TableBody>
                 {attendances.map((a) => (
                   <TableRow key={a.id}>
-                    <TableCell>{formatDate(a.date)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        {formatDate(a.date)}
+                        {a.isManualEntry && <Badge variant="outline">Manual</Badge>}
+                      </div>
+                    </TableCell>
                     <TableCell>{formatTime(a.timeIn)}</TableCell>
                     <TableCell>{formatTime(a.timeOut)}</TableCell>
                     <TableCell>
                       <Badge variant={attendanceStatusVariant[a.status]}>{a.status.replace("_", " ")}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={workTypeVariant[a.workType]}>{workTypeLabel[a.workType]}</Badge>
                     </TableCell>
                     <TableCell>{formatMinutes(a.lateMinutes)}</TableCell>
                     <TableCell>{formatMinutes(a.undertimeMinutes)}</TableCell>
@@ -72,7 +81,7 @@ export default function MyAttendancePage() {
                 ))}
                 {attendances.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-8 text-center text-slate-400">
+                    <TableCell colSpan={10} className="py-8 text-center text-slate-400">
                       No attendance records yet
                     </TableCell>
                   </TableRow>

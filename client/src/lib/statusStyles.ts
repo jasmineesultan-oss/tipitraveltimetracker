@@ -30,3 +30,15 @@ export const leaveCalendarColor: Record<string, string> = {
   PLANNED: "bg-blue-500",
   REJECTED: "bg-red-500",
 };
+
+export const workTypeLabel: Record<string, string> = {
+  OFFICE: "Office",
+  WORK_FROM_HOME: "Work From Home",
+  FIELD_WORK: "Field Work",
+};
+
+export const workTypeVariant: Record<string, BadgeProps["variant"]> = {
+  OFFICE: "info",
+  WORK_FROM_HOME: "purple",
+  FIELD_WORK: "warning",
+};

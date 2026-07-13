@@ -2,6 +2,7 @@ export type Role = "ADMIN" | "EMPLOYEE";
 export type EmployeeStatus = "ACTIVE" | "INACTIVE" | "TERMINATED" | "ON_LEAVE";
 export type AttendanceStatus = "PRESENT" | "LATE" | "ABSENT" | "HALF_DAY" | "ON_LEAVE" | "HOLIDAY" | "WEEKEND";
 export type HolidayType = "REGULAR" | "SPECIAL_NON_WORKING" | "SPECIAL_WORKING" | "LOCAL";
+export type WorkType = "OFFICE" | "WORK_FROM_HOME" | "FIELD_WORK";
 export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
 export type NotificationType =
   | "LEAVE_APPROVED"
@@ -88,6 +89,10 @@ export interface Attendance {
   holidayType?: HolidayType | null;
   holidayName?: string | null;
   holidayPayClass?: string | null;
+  workType: WorkType;
+  isManualEntry: boolean;
+  manualEntryBy?: string | null;
+  notes?: string | null;
 }
 
 export interface Holiday {

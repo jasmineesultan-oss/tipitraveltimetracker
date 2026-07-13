@@ -6,12 +6,13 @@ import { StatCard } from "@/components/shared/StatCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert } from "@/components/shared/Alert";
 import { PageSpinner } from "@/components/shared/Spinner";
 import { AttendanceCalendar } from "@/components/shared/AttendanceCalendar";
 import { formatDate, formatTime } from "@/lib/utils";
-import { attendanceStatusVariant, holidayTypeLabel } from "@/lib/statusStyles";
-import type { Attendance } from "@/types";
+import { attendanceStatusVariant, holidayTypeLabel, workTypeLabel } from "@/lib/statusStyles";
+import type { Attendance, WorkType } from "@/types";
 
 interface EmployeeDashboardData {
   todayAttendance: Attendance | null;
@@ -26,6 +27,7 @@ export default function EmployeeDashboardPage() {
   const [data, setData] = useState<EmployeeDashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [workType, setWorkType] = useState<WorkType>("OFFICE");
 
   async function load() {
     const { data } = await api.get<EmployeeDashboardData>("/dashboard/employee");
@@ -40,7 +42,7 @@ export default function EmployeeDashboardPage() {
     setBusy(true);
     setError(null);
     try {
-      await api.post("/attendance/time-in", { device: navigator.userAgent, browser: "Web" });
+      await api.post("/attendance/time-in", { device: navigator.userAgent, browser: "Web", workType });
       await load();
     } catch (err) {
       setError(apiErrorMessage(err));
@@ -98,7 +100,17 @@ export default function EmployeeDashboardPage() {
               Time Out: <strong>{formatTime(data.todayAttendance?.timeOut)}</strong>
             </span>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Select value={workType} onValueChange={(v) => setWorkType(v as WorkType)} disabled={!!data.todayAttendance?.timeIn}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="OFFICE">{workTypeLabel.OFFICE}</SelectItem>
+                <SelectItem value="WORK_FROM_HOME">{workTypeLabel.WORK_FROM_HOME}</SelectItem>
+                <SelectItem value="FIELD_WORK">{workTypeLabel.FIELD_WORK}</SelectItem>
+              </SelectContent>
+            </Select>
             <Button onClick={timeIn} disabled={busy || !!data.todayAttendance?.timeIn}>
               <LogIn className="h-4 w-4" /> Time In
             </Button>

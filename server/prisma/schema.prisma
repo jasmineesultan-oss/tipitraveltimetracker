@@ -38,6 +38,12 @@ enum HolidayType {
   LOCAL
 }
 
+enum WorkType {
+  OFFICE
+  WORK_FROM_HOME
+  FIELD_WORK
+}
+
 enum LeaveStatus {
   PENDING
   APPROVED
@@ -188,6 +194,9 @@ model Attendance {
   holidayType         HolidayType?
   holidayName         String?
   holidayPayClass     String?
+  workType            WorkType          @default(OFFICE)
+  isManualEntry       Boolean           @default(false)
+  manualEntryBy       String?
   notes               String?
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt

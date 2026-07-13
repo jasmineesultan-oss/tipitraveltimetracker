@@ -15,12 +15,15 @@ async function resolveEmployeeId(req: any): Promise<string> {
   return req.user.employeeId;
 }
 
+const workTypeEnum = z.enum(["OFFICE", "WORK_FROM_HOME", "FIELD_WORK"]);
+
 const timeInSchema = z.object({
   employeeId: z.string().min(1).optional(),
   device: z.string().optional(),
   browser: z.string().optional(),
   gpsLat: z.number().optional(),
   gpsLng: z.number().optional(),
+  workType: workTypeEnum.optional().default("OFFICE"),
 });
 
 router.post(
@@ -58,6 +61,7 @@ router.post(
             holidayType: computed.holidayType as any,
             holidayName: computed.holidayName,
             holidayPayClass: computed.holidayPayClass,
+            workType: body.workType,
           },
         })
       : await prisma.attendance.create({
@@ -77,6 +81,7 @@ router.post(
             holidayType: computed.holidayType as any,
             holidayName: computed.holidayName,
             holidayPayClass: computed.holidayPayClass,
+            workType: body.workType,
           },
         });
 
@@ -99,6 +104,7 @@ router.post(
 const timeOutSchema = z.object({
   employeeId: z.string().min(1).optional(),
   breakHours: z.number().min(0).optional(),
+  workType: workTypeEnum.optional(),
 });
 
 router.post(
@@ -131,6 +137,7 @@ router.post(
         undertimeMinutes: computed.undertimeMinutes,
         overtimeMinutes: computed.overtimeMinutes,
         status: computed.status as any,
+        ...(body.workType ? { workType: body.workType } : {}),
       },
     });
 
@@ -230,6 +237,85 @@ router.post(
       relatedEntityId: attendance.id,
     });
     res.json({ success: true });
+  })
+);
+
+const manualEntrySchema = z.object({
+  employeeId: z.string().min(1),
+  date: z.string().min(1),
+  timeIn: z.string().optional(),
+  timeOut: z.string().optional(),
+  workType: workTypeEnum.optional().default("OFFICE"),
+  notes: z.string().optional(),
+});
+
+router.post(
+  "/manual-entry",
+  requireAuth,
+  requireRole("ADMIN"),
+  asyncHandler(async (req, res) => {
+    const data = manualEntrySchema.parse(req.body);
+    const dayStart = startOfDayUTC(new Date(data.date));
+
+    const existing = await prisma.attendance.findUnique({
+      where: { employeeId_date: { employeeId: data.employeeId, date: dayStart } },
+    });
+
+    const timeInDate = data.timeIn ? new Date(data.timeIn) : existing?.timeIn ?? null;
+    const timeOutDate = data.timeOut ? new Date(data.timeOut) : existing?.timeOut ?? null;
+
+    let fields: any = {
+      workType: data.workType,
+      notes: data.notes,
+      isManualEntry: true,
+      manualEntryBy: req.user!.userId,
+    };
+
+    if (timeInDate) {
+      const computedIn = await computeTimeIn(data.employeeId, timeInDate);
+      fields = {
+        ...fields,
+        timeIn: timeInDate,
+        lateMinutes: computedIn.lateMinutes,
+        isWeekend: computedIn.isWeekend,
+        status: computedIn.status as any,
+        holidayId: computedIn.holidayId,
+        holidayType: computedIn.holidayType as any,
+        holidayName: computedIn.holidayName,
+        holidayPayClass: computedIn.holidayPayClass,
+      };
+
+      if (timeOutDate) {
+        const computedOut = await computeTimeOut(timeInDate, timeOutDate, 0, computedIn.status);
+        fields = {
+          ...fields,
+          timeOut: timeOutDate,
+          totalHours: computedOut.totalHours,
+          undertimeMinutes: computedOut.undertimeMinutes,
+          overtimeMinutes: computedOut.overtimeMinutes,
+          status: computedOut.status as any,
+        };
+      }
+    } else if (timeOutDate) {
+      fields = { ...fields, timeOut: timeOutDate };
+    }
+
+    const attendance = existing
+      ? await prisma.attendance.update({ where: { id: existing.id }, data: fields })
+      : await prisma.attendance.create({
+          data: { employeeId: data.employeeId, date: dayStart, ...fields },
+        });
+
+    await logAudit({
+      userId: req.user!.userId,
+      action: "ADMIN_ACTION",
+      entityType: "Attendance",
+      entityId: attendance.id,
+      details: "Manual attendance entry",
+      ipAddress: req.ip,
+    });
+
+    res.json(attendance);
   })
 );
 
