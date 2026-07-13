@@ -16,7 +16,7 @@ async function resolveEmployeeId(req: any): Promise<string> {
 }
 
 const timeInSchema = z.object({
-  employeeId: z.string().uuid().optional(),
+  employeeId: z.string().min(1).optional(),
   device: z.string().optional(),
   browser: z.string().optional(),
   gpsLat: z.number().optional(),
@@ -97,7 +97,7 @@ router.post(
 );
 
 const timeOutSchema = z.object({
-  employeeId: z.string().uuid().optional(),
+  employeeId: z.string().min(1).optional(),
   breakHours: z.number().min(0).optional(),
 });
 

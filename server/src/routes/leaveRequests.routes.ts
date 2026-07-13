@@ -75,8 +75,8 @@ router.get(
 );
 
 const createLeaveSchema = z.object({
-  employeeId: z.string().uuid().optional(),
-  leaveTypeId: z.string().uuid(),
+  employeeId: z.string().min(1).optional(),
+  leaveTypeId: z.string().min(1),
   startDate: z.string(),
   endDate: z.string(),
   reason: z.string().min(1),

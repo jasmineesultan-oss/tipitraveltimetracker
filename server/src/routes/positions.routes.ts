@@ -21,7 +21,7 @@ router.get(
 
 const positionSchema = z.object({
   title: z.string().min(1),
-  departmentId: z.string().uuid().nullable().optional(),
+  departmentId: z.string().min(1).nullable().optional(),
 });
 
 router.post(
