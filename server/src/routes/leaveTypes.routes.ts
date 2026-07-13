@@ -12,7 +12,22 @@ router.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const leaveTypes = await prisma.leaveTypeModel.findMany({ where: { isActive: true }, orderBy: { name: "asc" } });
-    res.json(leaveTypes);
+
+    if (req.user!.role === "ADMIN") {
+      return res.json(leaveTypes);
+    }
+
+    let employeeGender: string | null = null;
+    if (req.user!.employeeId) {
+      const employee = await prisma.employee.findUnique({
+        where: { id: req.user!.employeeId },
+        select: { gender: true },
+      });
+      employeeGender = employee?.gender ?? null;
+    }
+
+    const visibleLeaveTypes = leaveTypes.filter((lt) => !lt.applicableGender || lt.applicableGender === employeeGender);
+    res.json(visibleLeaveTypes);
   })
 );
 

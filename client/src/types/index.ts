@@ -3,6 +3,7 @@ export type EmployeeStatus = "ACTIVE" | "INACTIVE" | "TERMINATED" | "ON_LEAVE";
 export type AttendanceStatus = "PRESENT" | "LATE" | "ABSENT" | "HALF_DAY" | "ON_LEAVE" | "HOLIDAY" | "WEEKEND";
 export type HolidayType = "REGULAR" | "SPECIAL_NON_WORKING" | "SPECIAL_WORKING" | "LOCAL";
 export type WorkType = "OFFICE" | "WORK_FROM_HOME" | "FIELD_WORK";
+export type Gender = "MALE" | "FEMALE";
 export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
 export type NotificationType =
   | "LEAVE_APPROVED"
@@ -44,6 +45,7 @@ export interface Employee {
   position?: Position | null;
   hireDate?: string | null;
   status: EmployeeStatus;
+  gender?: Gender | null;
   scheduledStartTime?: string | null;
   scheduledEndTime?: string | null;
   managerId?: string | null;
@@ -113,6 +115,7 @@ export interface LeaveType {
   code: string;
   defaultDays: number;
   requiresAttachment: boolean;
+  applicableGender?: Gender | null;
   isActive: boolean;
 }
 

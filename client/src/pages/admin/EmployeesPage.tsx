@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Plus, Search, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Clock } from "lucide-react";
 import { getCoreRowModel, useReactTable, flexRender, createColumnHelper } from "@tanstack/react-table";
 import { api, apiErrorMessage } from "@/lib/api";
-import type { Department, Employee, Position } from "@/types";
+import type { Department, Employee, Gender, Position } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +13,10 @@ import { PageSpinner } from "@/components/shared/Spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ManualAttendanceEntryDialog } from "@/components/shared/ManualAttendanceEntryDialog";
 import { formatDate } from "@/lib/utils";
+
+const UNSPECIFIED_GENDER = "unspecified";
 
 interface EmployeeFormValues {
   employeeCode: string;
@@ -27,6 +30,7 @@ interface EmployeeFormValues {
   role: "ADMIN" | "EMPLOYEE";
   scheduledStartTime?: string;
   scheduledEndTime?: string;
+  gender?: Gender | typeof UNSPECIFIED_GENDER;
 }
 
 function EmployeeFormDialog({
@@ -66,8 +70,9 @@ function EmployeeFormDialog({
               role: employee.role || "EMPLOYEE",
               scheduledStartTime: employee.scheduledStartTime || "",
               scheduledEndTime: employee.scheduledEndTime || "",
+              gender: employee.gender || UNSPECIFIED_GENDER,
             }
-          : { role: "EMPLOYEE" }
+          : { role: "EMPLOYEE", gender: UNSPECIFIED_GENDER }
       );
     }
   }, [open, employee, reset]);
@@ -78,6 +83,7 @@ function EmployeeFormDialog({
       ...values,
       scheduledStartTime: values.scheduledStartTime || null,
       scheduledEndTime: values.scheduledEndTime || null,
+      gender: values.gender === UNSPECIFIED_GENDER ? null : values.gender,
     };
     try {
       if (employee) {
@@ -161,6 +167,19 @@ function EmployeeFormDialog({
                 <Input type="date" {...register("hireDate")} />
               </div>
               <div className="space-y-1">
+                <Label>Gender</Label>
+                <Select value={watch("gender")} onValueChange={(v) => setValue("gender", v as EmployeeFormValues["gender"])}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Not specified" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNSPECIFIED_GENDER}>Not specified</SelectItem>
+                    <SelectItem value="MALE">Male</SelectItem>
+                    <SelectItem value="FEMALE">Female</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
                 <Label>Department</Label>
                 <Select value={watch("departmentId")} onValueChange={(v) => setValue("departmentId", v)}>
                   <SelectTrigger>
@@ -225,6 +244,8 @@ export default function EmployeesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [logAttendanceOpen, setLogAttendanceOpen] = useState(false);
+  const [logAttendanceEmployeeId, setLogAttendanceEmployeeId] = useState<string | null>(null);
 
   async function load() {
     const [empRes, deptRes, posRes] = await Promise.all([
@@ -289,6 +310,17 @@ export default function EmployeesPage() {
         header: "",
         cell: (info) => (
           <div className="flex justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Log Attendance"
+              onClick={() => {
+                setLogAttendanceEmployeeId(info.row.original.id);
+                setLogAttendanceOpen(true);
+              }}
+            >
+              <Clock className="h-4 w-4" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -372,6 +404,14 @@ export default function EmployeesPage() {
         departments={departments}
         positions={positions}
         onSaved={load}
+      />
+
+      <ManualAttendanceEntryDialog
+        open={logAttendanceOpen}
+        onOpenChange={setLogAttendanceOpen}
+        employees={employees}
+        onSaved={load}
+        preselectedEmployeeId={logAttendanceEmployeeId ?? undefined}
       />
     </div>
   );

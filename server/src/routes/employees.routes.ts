@@ -70,6 +70,7 @@ const createEmployeeSchema = z.object({
   password: z.string().min(8).optional(),
   scheduledStartTime: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
   scheduledEndTime: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
+  gender: z.enum(["MALE", "FEMALE"]).optional().nullable(),
 });
 
 router.post(
@@ -102,14 +103,18 @@ router.post(
           managerId: data.managerId,
           scheduledStartTime: data.scheduledStartTime,
           scheduledEndTime: data.scheduledEndTime,
+          gender: data.gender,
         },
         include: { department: true, position: true, manager: true, user: true },
       });
 
       const leaveTypes = await tx.leaveTypeModel.findMany({ where: { isActive: true } });
       const year = new Date().getFullYear();
+      const applicableLeaveTypes = leaveTypes.filter(
+        (lt) => !lt.applicableGender || lt.applicableGender === emp.gender
+      );
       await tx.leaveBalance.createMany({
-        data: leaveTypes.map((lt) => ({
+        data: applicableLeaveTypes.map((lt) => ({
           employeeId: emp.id,
           leaveTypeId: lt.id,
           year,
@@ -138,6 +143,7 @@ const updateEmployeeSchema = z.object({
   profilePicture: z.string().nullable().optional(),
   scheduledStartTime: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
   scheduledEndTime: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
+  gender: z.enum(["MALE", "FEMALE"]).optional().nullable(),
 });
 
 router.put(

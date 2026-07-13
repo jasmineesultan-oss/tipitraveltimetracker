@@ -44,6 +44,11 @@ enum WorkType {
   FIELD_WORK
 }
 
+enum Gender {
+  MALE
+  FEMALE
+}
+
 enum LeaveStatus {
   PENDING
   APPROVED
@@ -138,6 +143,7 @@ model Employee {
   position        Position?      @relation(fields: [positionId], references: [id], onDelete: SetNull)
   hireDate        DateTime?
   status          EmployeeStatus @default(ACTIVE)
+  gender          Gender?
   scheduledStartTime String?
   scheduledEndTime   String?
   managerId       String?
@@ -213,6 +219,7 @@ model LeaveTypeModel {
   code                String   @unique
   defaultDays         Int      @default(0)
   requiresAttachment  Boolean  @default(false)
+  applicableGender    Gender?
   isActive            Boolean  @default(true)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
