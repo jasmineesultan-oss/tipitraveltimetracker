@@ -132,6 +132,7 @@ router.post(
 );
 
 const updateEmployeeSchema = z.object({
+  employeeCode: z.string().min(1).optional(),
   firstName: z.string().min(1).optional(),
   lastName: z.string().min(1).optional(),
   phone: z.string().optional(),
@@ -152,12 +153,56 @@ router.put(
   requireRole("ADMIN"),
   asyncHandler(async (req, res) => {
     const data = updateEmployeeSchema.parse(req.body);
+
+    if (data.employeeCode) {
+      const conflict = await prisma.employee.findFirst({
+        where: { employeeCode: data.employeeCode, NOT: { id: req.params.id } },
+      });
+      if (conflict) throw new ApiError(400, "Employee code already in use");
+    }
+
     const employee = await prisma.employee.update({
       where: { id: req.params.id },
       data: { ...data, hireDate: data.hireDate ? new Date(data.hireDate) : undefined },
       include: { department: true, position: true, manager: true, user: true },
     });
     await logAudit({ userId: req.user!.userId, action: "ADMIN_ACTION", entityType: "Employee", entityId: employee.id, details: "Updated employee", ipAddress: req.ip });
+    res.json(safeEmployee(employee));
+  })
+);
+
+router.put(
+  "/:id/deactivate",
+  requireAuth,
+  requireRole("ADMIN"),
+  asyncHandler(async (req, res) => {
+    const existing = await prisma.employee.findUnique({ where: { id: req.params.id } });
+    if (!existing) throw new ApiError(404, "Employee not found");
+
+    const employee = await prisma.employee.update({
+      where: { id: req.params.id },
+      data: { status: "INACTIVE", user: { update: { isActive: false } } },
+      include: { department: true, position: true, manager: true, user: true },
+    });
+    await logAudit({ userId: req.user!.userId, action: "ADMIN_ACTION", entityType: "Employee", entityId: employee.id, details: "Deactivated employee", ipAddress: req.ip });
+    res.json(safeEmployee(employee));
+  })
+);
+
+router.put(
+  "/:id/activate",
+  requireAuth,
+  requireRole("ADMIN"),
+  asyncHandler(async (req, res) => {
+    const existing = await prisma.employee.findUnique({ where: { id: req.params.id } });
+    if (!existing) throw new ApiError(404, "Employee not found");
+
+    const employee = await prisma.employee.update({
+      where: { id: req.params.id },
+      data: { status: "ACTIVE", user: { update: { isActive: true } } },
+      include: { department: true, position: true, manager: true, user: true },
+    });
+    await logAudit({ userId: req.user!.userId, action: "ADMIN_ACTION", entityType: "Employee", entityId: employee.id, details: "Reactivated employee", ipAddress: req.ip });
     res.json(safeEmployee(employee));
   })
 );

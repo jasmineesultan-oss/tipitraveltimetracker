@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Plus, Search, Pencil, Trash2, Clock } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Clock, UserX, UserCheck } from "lucide-react";
 import { getCoreRowModel, useReactTable, flexRender, createColumnHelper } from "@tanstack/react-table";
 import { api, apiErrorMessage } from "@/lib/api";
 import type { Department, Employee, Gender, Position } from "@/types";
@@ -132,7 +132,7 @@ function EmployeeFormDialog({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Employee Code</Label>
-                <Input {...register("employeeCode", { required: true })} disabled={!!employee} />
+                <Input {...register("employeeCode", { required: true })} />
               </div>
               <div className="space-y-1">
                 <Label>Role</Label>
@@ -264,10 +264,31 @@ export default function EmployeesPage() {
   }, [search]);
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this employee? This cannot be undone.")) return;
+    if (!confirm("Delete this employee? This permanently deletes the account - use Deactivate instead if you might rehire them.")) return;
     setError(null);
     try {
       await api.delete(`/employees/${id}`);
+      load();
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    }
+  }
+
+  async function handleDeactivate(id: string) {
+    if (!confirm("Deactivate this employee? They won't be able to log in until reactivated.")) return;
+    setError(null);
+    try {
+      await api.put(`/employees/${id}/deactivate`);
+      load();
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    }
+  }
+
+  async function handleActivate(id: string) {
+    setError(null);
+    try {
+      await api.put(`/employees/${id}/activate`);
       load();
     } catch (err) {
       setError(apiErrorMessage(err));
@@ -331,6 +352,17 @@ export default function EmployeesPage() {
             >
               <Pencil className="h-4 w-4" />
             </Button>
+            {info.row.original.status === "INACTIVE" ? (
+              <Button variant="ghost" size="icon" title="Activate" onClick={() => handleActivate(info.row.original.id)}>
+                <UserCheck className="h-4 w-4 text-emerald-600" />
+              </Button>
+            ) : (
+              info.row.original.status !== "TERMINATED" && (
+                <Button variant="ghost" size="icon" title="Deactivate" onClick={() => handleDeactivate(info.row.original.id)}>
+                  <UserX className="h-4 w-4 text-amber-600" />
+                </Button>
+              )
+            )}
             <Button variant="ghost" size="icon" onClick={() => handleDelete(info.row.original.id)}>
               <Trash2 className="h-4 w-4 text-red-500" />
             </Button>
