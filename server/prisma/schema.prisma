@@ -138,6 +138,8 @@ model Employee {
   position        Position?      @relation(fields: [positionId], references: [id], onDelete: SetNull)
   hireDate        DateTime?
   status          EmployeeStatus @default(ACTIVE)
+  scheduledStartTime String?
+  scheduledEndTime   String?
   managerId       String?
   manager         Employee?      @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
   subordinates    Employee[]     @relation("EmployeeManager")

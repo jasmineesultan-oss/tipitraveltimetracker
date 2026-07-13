@@ -44,6 +44,8 @@ export interface Employee {
   position?: Position | null;
   hireDate?: string | null;
   status: EmployeeStatus;
+  scheduledStartTime?: string | null;
+  scheduledEndTime?: string | null;
   managerId?: string | null;
   manager?: Employee | null;
   profilePicture?: string | null;

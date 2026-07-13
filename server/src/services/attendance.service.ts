@@ -2,12 +2,28 @@ import { prisma } from "../lib/prisma";
 import { getWorkSettings } from "./settings.service";
 import { payClassificationFor } from "../utils/phHolidays";
 
+/** Asia/Manila is a fixed UTC+8 offset with no daylight saving time. */
+export const PH_OFFSET_MINUTES = 480;
+
+export function toPhShifted(date: Date): Date {
+  return new Date(date.getTime() + PH_OFFSET_MINUTES * 60 * 1000);
+}
+
+/**
+ * Returns the UTC instant representing midnight Asia/Manila time on the
+ * Philippines calendar day that `date` falls in. Stored timestamps remain
+ * true UTC instants; only this calendar-day derivation is timezone-shifted.
+ */
 export function startOfDayUTC(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const shifted = toPhShifted(date);
+  const y = shifted.getUTCFullYear();
+  const m = shifted.getUTCMonth();
+  const d = shifted.getUTCDate();
+  return new Date(Date.UTC(y, m, d) - PH_OFFSET_MINUTES * 60 * 1000);
 }
 
 export function isWeekend(date: Date): boolean {
-  const day = date.getUTCDay();
+  const day = toPhShifted(date).getUTCDay();
   return day === 0 || day === 6;
 }
 
@@ -24,18 +40,32 @@ function timeStringToMinutes(hhmm: string): number {
   return h * 60 + m;
 }
 
-function minutesSinceMidnightUTC(date: Date): number {
-  return date.getUTCHours() * 60 + date.getUTCMinutes();
+function minutesSinceMidnightPH(date: Date): number {
+  const shifted = toPhShifted(date);
+  return shifted.getUTCHours() * 60 + shifted.getUTCMinutes();
+}
+
+async function resolveWorkSchedule(employeeId: string) {
+  const settings = await getWorkSettings();
+  const employee = await prisma.employee.findUnique({
+    where: { id: employeeId },
+    select: { scheduledStartTime: true, scheduledEndTime: true },
+  });
+  return {
+    ...settings,
+    workStartTime: employee?.scheduledStartTime || settings.workStartTime,
+    workEndTime: employee?.scheduledEndTime || settings.workEndTime,
+  };
 }
 
 export async function computeTimeIn(employeeId: string, timeIn: Date) {
-  const settings = await getWorkSettings();
+  const settings = await resolveWorkSchedule(employeeId);
   const dayStart = startOfDayUTC(timeIn);
   const holiday = await findHolidayForDate(timeIn);
   const weekend = isWeekend(timeIn);
 
   const expectedStartMinutes = timeStringToMinutes(settings.workStartTime);
-  const actualMinutes = minutesSinceMidnightUTC(timeIn);
+  const actualMinutes = minutesSinceMidnightPH(timeIn);
   const lateMinutes = Math.max(0, actualMinutes - expectedStartMinutes - settings.gracePeriodMinutes);
 
   let status: "PRESENT" | "LATE" | "WEEKEND" | "HOLIDAY" = lateMinutes > 0 ? "LATE" : "PRESENT";
@@ -54,13 +84,19 @@ export async function computeTimeIn(employeeId: string, timeIn: Date) {
   };
 }
 
-export async function computeTimeOut(timeIn: Date, timeOut: Date, breakHours: number, existingStatus: string) {
-  const settings = await getWorkSettings();
+export async function computeTimeOut(
+  employeeId: string,
+  timeIn: Date,
+  timeOut: Date,
+  breakHours: number,
+  existingStatus: string
+) {
+  const settings = await resolveWorkSchedule(employeeId);
   const grossHours = (timeOut.getTime() - timeIn.getTime()) / (1000 * 60 * 60);
   const totalHours = Math.max(0, grossHours - (breakHours || 0));
 
   const expectedEndMinutes = timeStringToMinutes(settings.workEndTime);
-  const actualOutMinutes = minutesSinceMidnightUTC(timeOut);
+  const actualOutMinutes = minutesSinceMidnightPH(timeOut);
 
   const undertimeMinutes = Math.max(0, expectedEndMinutes - actualOutMinutes);
   const overtimeMinutes = Math.max(0, actualOutMinutes - expectedEndMinutes);

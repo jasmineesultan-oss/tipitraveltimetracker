@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { asyncHandler, ApiError } from "../middleware/errorHandler";
-import { computeTimeIn, computeTimeOut, startOfDayUTC } from "../services/attendance.service";
+import { computeTimeIn, computeTimeOut, startOfDayUTC, toPhShifted } from "../services/attendance.service";
 import { logAudit } from "../services/auditLog.service";
 import { notifyAllAdmins, notify } from "../services/notification.service";
 
@@ -126,7 +126,7 @@ router.post(
       throw new ApiError(400, "Already timed out today");
     }
 
-    const computed = await computeTimeOut(existing.timeIn, now, body.breakHours || 0, existing.status);
+    const computed = await computeTimeOut(employeeId, existing.timeIn, now, body.breakHours || 0, existing.status);
 
     const attendance = await prisma.attendance.update({
       where: { id: existing.id },
@@ -173,15 +173,15 @@ router.get(
     let dateFilter: any = undefined;
     if (startDate || endDate) {
       dateFilter = {};
-      if (startDate) dateFilter.gte = new Date(startDate);
-      if (endDate) dateFilter.lte = new Date(endDate);
+      if (startDate) dateFilter.gte = startOfDayUTC(new Date(startDate));
+      if (endDate) dateFilter.lte = startOfDayUTC(new Date(endDate));
     } else if (month && year) {
       const m = parseInt(month, 10) - 1;
       const y = parseInt(year, 10);
-      dateFilter = { gte: new Date(Date.UTC(y, m, 1)), lt: new Date(Date.UTC(y, m + 1, 1)) };
+      dateFilter = { gte: startOfDayUTC(new Date(Date.UTC(y, m, 1))), lt: startOfDayUTC(new Date(Date.UTC(y, m + 1, 1))) };
     } else if (year) {
       const y = parseInt(year, 10);
-      dateFilter = { gte: new Date(Date.UTC(y, 0, 1)), lt: new Date(Date.UTC(y + 1, 0, 1)) };
+      dateFilter = { gte: startOfDayUTC(new Date(Date.UTC(y, 0, 1))), lt: startOfDayUTC(new Date(Date.UTC(y + 1, 0, 1))) };
     }
 
     const attendances = await prisma.attendance.findMany({
@@ -206,14 +206,14 @@ router.get(
       throw new ApiError(403, "Forbidden");
     }
     const { month, year } = req.query as Record<string, string | undefined>;
-    const now = new Date();
-    const y = year ? parseInt(year, 10) : now.getUTCFullYear();
-    const m = month ? parseInt(month, 10) - 1 : now.getUTCMonth();
+    const nowPh = toPhShifted(new Date());
+    const y = year ? parseInt(year, 10) : nowPh.getUTCFullYear();
+    const m = month ? parseInt(month, 10) - 1 : nowPh.getUTCMonth();
 
     const attendances = await prisma.attendance.findMany({
       where: {
         employeeId: req.params.employeeId,
-        date: { gte: new Date(Date.UTC(y, m, 1)), lt: new Date(Date.UTC(y, m + 1, 1)) },
+        date: { gte: startOfDayUTC(new Date(Date.UTC(y, m, 1))), lt: startOfDayUTC(new Date(Date.UTC(y, m + 1, 1))) },
       },
       orderBy: { date: "asc" },
     });
@@ -286,7 +286,7 @@ router.post(
       };
 
       if (timeOutDate) {
-        const computedOut = await computeTimeOut(timeInDate, timeOutDate, 0, computedIn.status);
+        const computedOut = await computeTimeOut(data.employeeId, timeInDate, timeOutDate, 0, computedIn.status);
         fields = {
           ...fields,
           timeOut: timeOutDate,

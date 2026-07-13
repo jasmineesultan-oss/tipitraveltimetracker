@@ -68,6 +68,8 @@ const createEmployeeSchema = z.object({
   managerId: z.string().min(1).optional(),
   role: z.enum(["ADMIN", "EMPLOYEE"]).default("EMPLOYEE"),
   password: z.string().min(8).optional(),
+  scheduledStartTime: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
+  scheduledEndTime: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
 });
 
 router.post(
@@ -98,6 +100,8 @@ router.post(
           positionId: data.positionId,
           hireDate: data.hireDate ? new Date(data.hireDate) : undefined,
           managerId: data.managerId,
+          scheduledStartTime: data.scheduledStartTime,
+          scheduledEndTime: data.scheduledEndTime,
         },
         include: { department: true, position: true, manager: true, user: true },
       });
@@ -132,6 +136,8 @@ const updateEmployeeSchema = z.object({
   managerId: z.string().min(1).nullable().optional(),
   status: z.enum(["ACTIVE", "INACTIVE", "TERMINATED", "ON_LEAVE"]).optional(),
   profilePicture: z.string().nullable().optional(),
+  scheduledStartTime: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
+  scheduledEndTime: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
 });
 
 router.put(

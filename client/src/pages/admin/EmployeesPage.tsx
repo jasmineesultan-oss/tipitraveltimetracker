@@ -25,6 +25,8 @@ interface EmployeeFormValues {
   positionId?: string;
   hireDate?: string;
   role: "ADMIN" | "EMPLOYEE";
+  scheduledStartTime?: string;
+  scheduledEndTime?: string;
 }
 
 function EmployeeFormDialog({
@@ -62,6 +64,8 @@ function EmployeeFormDialog({
               positionId: employee.positionId || undefined,
               hireDate: employee.hireDate ? employee.hireDate.slice(0, 10) : "",
               role: employee.role || "EMPLOYEE",
+              scheduledStartTime: employee.scheduledStartTime || "",
+              scheduledEndTime: employee.scheduledEndTime || "",
             }
           : { role: "EMPLOYEE" }
       );
@@ -70,13 +74,18 @@ function EmployeeFormDialog({
 
   async function onSubmit(values: EmployeeFormValues) {
     setError(null);
+    const payload = {
+      ...values,
+      scheduledStartTime: values.scheduledStartTime || null,
+      scheduledEndTime: values.scheduledEndTime || null,
+    };
     try {
       if (employee) {
-        await api.put(`/employees/${employee.id}`, values);
+        await api.put(`/employees/${employee.id}`, payload);
         onSaved();
         onOpenChange(false);
       } else {
-        const { data } = await api.post("/employees", values);
+        const { data } = await api.post("/employees", payload);
         if (data.temporaryPassword) {
           setTempPassword(data.temporaryPassword);
         } else {
@@ -181,6 +190,17 @@ function EmployeeFormDialog({
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-1">
+                <Label>Scheduled Start Time</Label>
+                <Input type="time" {...register("scheduledStartTime")} />
+              </div>
+              <div className="space-y-1">
+                <Label>Scheduled End Time</Label>
+                <Input type="time" {...register("scheduledEndTime")} />
+              </div>
+              <p className="col-span-2 -mt-1.5 text-xs text-slate-400">
+                Leave blank to use the company default schedule.
+              </p>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
