@@ -15,6 +15,13 @@ import { attendanceStatusVariant, workTypeLabel, workTypeVariant } from "@/lib/s
 
 const STATUS_OPTIONS = ["PRESENT", "LATE", "ABSENT", "HALF_DAY", "ON_LEAVE", "HOLIDAY", "WEEKEND"];
 
+function manualEntrySourceLabel(a: Attendance): string {
+  if (a.manualEntryBy && a.employee?.userId && a.manualEntryBy === a.employee.userId) {
+    return "Self-corrected by employee";
+  }
+  return "Entered by admin";
+}
+
 export default function AttendancePage() {
   const [attendances, setAttendances] = useState<Attendance[] | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -139,7 +146,14 @@ export default function AttendancePage() {
                 <TableCell className="font-medium text-slate-900">
                   <div className="flex items-center gap-1.5">
                     {a.employee?.firstName} {a.employee?.lastName}
-                    {a.isManualEntry && <Badge variant="outline">Manual</Badge>}
+                    {a.isManualEntry && (
+                      <Badge
+                        variant={manualEntrySourceLabel(a) === "Self-corrected by employee" ? "purple" : "outline"}
+                        title={manualEntrySourceLabel(a)}
+                      >
+                        {manualEntrySourceLabel(a)}
+                      </Badge>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell>{a.employee?.department?.name || "—"}</TableCell>

@@ -113,3 +113,48 @@ export async function computeTimeOut(
     status,
   };
 }
+
+/**
+ * Shared computation for backfilled attendance (admin manual entry and
+ * employee self-correction): runs whichever of timeIn/timeOut is present
+ * through computeTimeIn/computeTimeOut so late/undertime/overtime/status
+ * stay consistent with a real punch.
+ */
+export async function computeManualAttendanceFields(
+  employeeId: string,
+  timeInDate: Date | null,
+  timeOutDate: Date | null
+) {
+  let fields: Record<string, unknown> = {};
+
+  if (timeInDate) {
+    const computedIn = await computeTimeIn(employeeId, timeInDate);
+    fields = {
+      ...fields,
+      timeIn: timeInDate,
+      lateMinutes: computedIn.lateMinutes,
+      isWeekend: computedIn.isWeekend,
+      status: computedIn.status,
+      holidayId: computedIn.holidayId,
+      holidayType: computedIn.holidayType,
+      holidayName: computedIn.holidayName,
+      holidayPayClass: computedIn.holidayPayClass,
+    };
+
+    if (timeOutDate) {
+      const computedOut = await computeTimeOut(employeeId, timeInDate, timeOutDate, 0, computedIn.status);
+      fields = {
+        ...fields,
+        timeOut: timeOutDate,
+        totalHours: computedOut.totalHours,
+        undertimeMinutes: computedOut.undertimeMinutes,
+        overtimeMinutes: computedOut.overtimeMinutes,
+        status: computedOut.status,
+      };
+    }
+  } else if (timeOutDate) {
+    fields = { ...fields, timeOut: timeOutDate };
+  }
+
+  return fields;
+}

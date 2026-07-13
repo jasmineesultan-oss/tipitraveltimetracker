@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { asyncHandler, ApiError } from "../middleware/errorHandler";
-import { computeTimeIn, computeTimeOut, startOfDayUTC, toPhShifted } from "../services/attendance.service";
+import { computeTimeIn, computeTimeOut, computeManualAttendanceFields, startOfDayUTC, toPhShifted } from "../services/attendance.service";
 import { logAudit } from "../services/auditLog.service";
 import { notifyAllAdmins, notify } from "../services/notification.service";
 
@@ -264,41 +264,14 @@ router.post(
     const timeInDate = data.timeIn ? new Date(data.timeIn) : existing?.timeIn ?? null;
     const timeOutDate = data.timeOut ? new Date(data.timeOut) : existing?.timeOut ?? null;
 
-    let fields: any = {
+    const computedFields = await computeManualAttendanceFields(data.employeeId, timeInDate, timeOutDate);
+    const fields: any = {
       workType: data.workType,
       notes: data.notes,
       isManualEntry: true,
       manualEntryBy: req.user!.userId,
+      ...computedFields,
     };
-
-    if (timeInDate) {
-      const computedIn = await computeTimeIn(data.employeeId, timeInDate);
-      fields = {
-        ...fields,
-        timeIn: timeInDate,
-        lateMinutes: computedIn.lateMinutes,
-        isWeekend: computedIn.isWeekend,
-        status: computedIn.status as any,
-        holidayId: computedIn.holidayId,
-        holidayType: computedIn.holidayType as any,
-        holidayName: computedIn.holidayName,
-        holidayPayClass: computedIn.holidayPayClass,
-      };
-
-      if (timeOutDate) {
-        const computedOut = await computeTimeOut(data.employeeId, timeInDate, timeOutDate, 0, computedIn.status);
-        fields = {
-          ...fields,
-          timeOut: timeOutDate,
-          totalHours: computedOut.totalHours,
-          undertimeMinutes: computedOut.undertimeMinutes,
-          overtimeMinutes: computedOut.overtimeMinutes,
-          status: computedOut.status as any,
-        };
-      }
-    } else if (timeOutDate) {
-      fields = { ...fields, timeOut: timeOutDate };
-    }
 
     const attendance = existing
       ? await prisma.attendance.update({ where: { id: existing.id }, data: fields })
@@ -313,6 +286,80 @@ router.post(
       entityId: attendance.id,
       details: "Manual attendance entry",
       ipAddress: req.ip,
+    });
+
+    res.json(attendance);
+  })
+);
+
+const selfCorrectionSchema = z.object({
+  date: z.string().min(1),
+  timeIn: z.string().optional(),
+  timeOut: z.string().optional(),
+  workType: workTypeEnum.optional(),
+  notes: z.string().optional(),
+});
+
+router.post(
+  "/self-correction",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const data = selfCorrectionSchema.parse(req.body);
+    const employeeId = req.user!.employeeId;
+    if (!employeeId) throw new ApiError(400, "No employee profile linked to this account");
+
+    if (!data.timeIn && !data.timeOut) {
+      throw new ApiError(400, "Provide at least a time in or time out");
+    }
+
+    const requestedDayStart = startOfDayUTC(new Date(data.date));
+    const todayStart = startOfDayUTC(new Date());
+    if (requestedDayStart.getTime() >= todayStart.getTime()) {
+      throw new ApiError(400, "Attendance corrections can only be submitted for past dates");
+    }
+
+    const employee = await prisma.employee.findUnique({ where: { id: employeeId } });
+    if (!employee) throw new ApiError(404, "Employee not found");
+
+    const existing = await prisma.attendance.findUnique({
+      where: { employeeId_date: { employeeId, date: requestedDayStart } },
+    });
+
+    const timeInDate = data.timeIn ? new Date(data.timeIn) : existing?.timeIn ?? null;
+    const timeOutDate = data.timeOut ? new Date(data.timeOut) : existing?.timeOut ?? null;
+
+    const computedFields = await computeManualAttendanceFields(employeeId, timeInDate, timeOutDate);
+    const fields: any = {
+      notes: data.notes,
+      isManualEntry: true,
+      manualEntryBy: req.user!.userId,
+      ...(data.workType ? { workType: data.workType } : {}),
+      ...computedFields,
+    };
+
+    const attendance = existing
+      ? await prisma.attendance.update({ where: { id: existing.id }, data: fields })
+      : await prisma.attendance.create({
+          data: { employeeId, date: requestedDayStart, ...fields },
+        });
+
+    const dateLabel = requestedDayStart.toISOString().slice(0, 10);
+
+    await logAudit({
+      userId: req.user!.userId,
+      action: "ATTENDANCE_SELF_CORRECTION",
+      entityType: "Attendance",
+      entityId: attendance.id,
+      details: `Employee submitted a manual correction for ${dateLabel}`,
+      ipAddress: req.ip,
+    });
+
+    await notifyAllAdmins({
+      type: "ATTENDANCE_ANOMALY",
+      title: "Attendance Self-Correction Submitted",
+      message: `${employee.firstName} ${employee.lastName} submitted a manual attendance correction for ${dateLabel}.`,
+      relatedEntityType: "Attendance",
+      relatedEntityId: attendance.id,
     });
 
     res.json(attendance);
