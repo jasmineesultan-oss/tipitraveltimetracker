@@ -205,7 +205,7 @@ router.put(
       }
 
       return lr;
-    });
+    }, { timeout: 15000 });
 
     await logAudit({ userId: req.user!.userId, action: "LEAVE_APPROVED", entityType: "LeaveRequest", entityId: updated.id, ipAddress: req.ip });
     await notify({

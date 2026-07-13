@@ -104,16 +104,18 @@ router.post(
 
       const leaveTypes = await tx.leaveTypeModel.findMany({ where: { isActive: true } });
       const year = new Date().getFullYear();
-      await Promise.all(
-        leaveTypes.map((lt) =>
-          tx.leaveBalance.create({
-            data: { employeeId: emp.id, leaveTypeId: lt.id, year, allocatedDays: lt.defaultDays, usedDays: 0 },
-          })
-        )
-      );
+      await tx.leaveBalance.createMany({
+        data: leaveTypes.map((lt) => ({
+          employeeId: emp.id,
+          leaveTypeId: lt.id,
+          year,
+          allocatedDays: lt.defaultDays,
+          usedDays: 0,
+        })),
+      });
 
       return emp;
-    });
+    }, { timeout: 15000 });
 
     await logAudit({ userId: req.user!.userId, action: "ADMIN_ACTION", entityType: "Employee", entityId: employee.id, details: "Created employee", ipAddress: req.ip });
     res.status(201).json({ ...safeEmployee(employee), temporaryPassword: data.password ? undefined : tempPassword });
