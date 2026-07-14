@@ -226,44 +226,87 @@ export default function DepartmentsPage() {
               <Plus className="h-4 w-4" /> Add Department
             </Button>
           </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Code</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Employees</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {departments.map((d) => (
-                <TableRow key={d.id}>
-                  <TableCell className="font-medium text-slate-900">{d.name}</TableCell>
-                  <TableCell>{d.code}</TableCell>
-                  <TableCell>{d.description || "—"}</TableCell>
-                  <TableCell>{d._count?.employees ?? 0}</TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setEditingDept(d);
-                          setDeptDialogOpen(true);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => deleteDepartment(d.id)}>
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
-                  </TableCell>
+          <div className="space-y-3 sm:hidden">
+            {departments.map((d) => (
+              <div key={d.id} className="rounded-lg border border-slate-200 bg-white p-4">
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <p className="font-medium text-slate-900">{d.name}</p>
+                  <div className="flex shrink-0 gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setEditingDept(d);
+                        setDeptDialogOpen(true);
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => deleteDepartment(d.id)}>
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  </div>
+                </div>
+                <dl className="space-y-1.5 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-500">Code</dt>
+                    <dd className="text-slate-700">{d.code}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-500">Description</dt>
+                    <dd className="text-right text-slate-700">{d.description || "—"}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-500">Employees</dt>
+                    <dd className="text-slate-700">{d._count?.employees ?? 0}</dd>
+                  </div>
+                </dl>
+              </div>
+            ))}
+            {departments.length === 0 && (
+              <p className="rounded-lg border border-slate-200 bg-white py-8 text-center text-slate-400">No departments yet</p>
+            )}
+          </div>
+          <div className="hidden sm:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Employees</TableHead>
+                  <TableHead />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {departments.map((d) => (
+                  <TableRow key={d.id}>
+                    <TableCell className="font-medium text-slate-900">{d.name}</TableCell>
+                    <TableCell>{d.code}</TableCell>
+                    <TableCell>{d.description || "—"}</TableCell>
+                    <TableCell>{d._count?.employees ?? 0}</TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setEditingDept(d);
+                            setDeptDialogOpen(true);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => deleteDepartment(d.id)}>
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </Tabs.Content>
 
         <Tabs.Content value="positions" className="space-y-3">
@@ -277,42 +320,81 @@ export default function DepartmentsPage() {
               <Plus className="h-4 w-4" /> Add Position
             </Button>
           </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Department</TableHead>
-                <TableHead>Employees</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {positions.map((p) => (
-                <TableRow key={p.id}>
-                  <TableCell className="font-medium text-slate-900">{p.title}</TableCell>
-                  <TableCell>{p.department?.name || "—"}</TableCell>
-                  <TableCell>{p._count?.employees ?? 0}</TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setEditingPos(p);
-                          setPosDialogOpen(true);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => deletePosition(p.id)}>
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
-                  </TableCell>
+          <div className="space-y-3 sm:hidden">
+            {positions.map((p) => (
+              <div key={p.id} className="rounded-lg border border-slate-200 bg-white p-4">
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <p className="font-medium text-slate-900">{p.title}</p>
+                  <div className="flex shrink-0 gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setEditingPos(p);
+                        setPosDialogOpen(true);
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => deletePosition(p.id)}>
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  </div>
+                </div>
+                <dl className="space-y-1.5 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-500">Department</dt>
+                    <dd className="text-slate-700">{p.department?.name || "—"}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-500">Employees</dt>
+                    <dd className="text-slate-700">{p._count?.employees ?? 0}</dd>
+                  </div>
+                </dl>
+              </div>
+            ))}
+            {positions.length === 0 && (
+              <p className="rounded-lg border border-slate-200 bg-white py-8 text-center text-slate-400">No positions yet</p>
+            )}
+          </div>
+          <div className="hidden sm:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Employees</TableHead>
+                  <TableHead />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {positions.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium text-slate-900">{p.title}</TableCell>
+                    <TableCell>{p.department?.name || "—"}</TableCell>
+                    <TableCell>{p._count?.employees ?? 0}</TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setEditingPos(p);
+                            setPosDialogOpen(true);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => deletePosition(p.id)}>
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </Tabs.Content>
       </Tabs.Root>
 

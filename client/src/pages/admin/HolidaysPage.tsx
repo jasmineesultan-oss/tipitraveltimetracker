@@ -151,12 +151,12 @@ export default function HolidaysPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="w-32 space-y-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="w-full space-y-1 sm:w-32">
           <Label>Year</Label>
           <Input type="number" value={year} onChange={(e) => setYear(parseInt(e.target.value, 10) || year)} />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={handleSync} disabled={syncing}>
             <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} /> Sync PH Holidays
           </Button>
@@ -175,30 +175,19 @@ export default function HolidaysPage() {
 
       {!holidays ? (
         <PageSpinner />
+      ) : holidays.length === 0 ? (
+        <p className="rounded-lg border border-slate-200 bg-white py-8 text-center text-slate-400">
+          No holidays for {year}. Try syncing PH holidays.
+        </p>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Province</TableHead>
-              <TableHead>Pay Classification</TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+        <>
+          {/* Stacked cards on small screens */}
+          <div className="space-y-3 sm:hidden">
             {holidays.map((h) => (
-              <TableRow key={h.id}>
-                <TableCell className="font-medium text-slate-900">{h.name}</TableCell>
-                <TableCell>{formatDate(h.date)}</TableCell>
-                <TableCell>
-                  <Badge variant="info">{holidayTypeLabel[h.type]}</Badge>
-                </TableCell>
-                <TableCell>{h.province || "Nationwide"}</TableCell>
-                <TableCell className="max-w-sm text-xs text-slate-500">{h.payClassification}</TableCell>
-                <TableCell>
-                  <div className="flex justify-end gap-1">
+              <div key={h.id} className="rounded-lg border border-slate-200 bg-white p-4">
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <p className="font-medium text-slate-900">{h.name}</p>
+                  <div className="flex shrink-0 gap-1">
                     <Button
                       variant="ghost"
                       size="icon"
@@ -213,18 +202,77 @@ export default function HolidaysPage() {
                       <Trash2 className="h-4 w-4 text-red-500" />
                     </Button>
                   </div>
-                </TableCell>
-              </TableRow>
+                </div>
+                <dl className="space-y-1.5 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-500">Date</dt>
+                    <dd className="text-slate-700">{formatDate(h.date)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-500">Type</dt>
+                    <dd>
+                      <Badge variant="info">{holidayTypeLabel[h.type]}</Badge>
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-500">Province</dt>
+                    <dd className="text-slate-700">{h.province || "Nationwide"}</dd>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <dt className="text-slate-500">Pay Classification</dt>
+                    <dd className="text-xs text-slate-500">{h.payClassification}</dd>
+                  </div>
+                </dl>
+              </div>
             ))}
-            {holidays.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center text-slate-400">
-                  No holidays for {year}. Try syncing PH holidays.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+          </div>
+
+          {/* Table on sm and above */}
+          <div className="hidden sm:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Province</TableHead>
+                  <TableHead>Pay Classification</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {holidays.map((h) => (
+                  <TableRow key={h.id}>
+                    <TableCell className="font-medium text-slate-900">{h.name}</TableCell>
+                    <TableCell>{formatDate(h.date)}</TableCell>
+                    <TableCell>
+                      <Badge variant="info">{holidayTypeLabel[h.type]}</Badge>
+                    </TableCell>
+                    <TableCell>{h.province || "Nationwide"}</TableCell>
+                    <TableCell className="max-w-sm text-xs text-slate-500">{h.payClassification}</TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setEditingHoliday(h);
+                            setDialogOpen(true);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(h.id)}>
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       )}
 
       <HolidayDialog open={dialogOpen} onOpenChange={setDialogOpen} holiday={editingHoliday} onSaved={load} />

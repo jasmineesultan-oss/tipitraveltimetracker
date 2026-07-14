@@ -129,7 +129,7 @@ function EmployeeFormDialog({
         ) : (
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
             {error && <Alert>{error}</Alert>}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label>Employee Code</Label>
                 <Input {...register("employeeCode", { required: true })} />
@@ -154,7 +154,7 @@ function EmployeeFormDialog({
                 <Label>Last Name</Label>
                 <Input {...register("lastName", { required: true })} />
               </div>
-              <div className="col-span-2 space-y-1">
+              <div className="sm:col-span-2 space-y-1">
                 <Label>Email</Label>
                 <Input type="email" {...register("email", { required: true })} disabled={!!employee} />
               </div>
@@ -217,7 +217,7 @@ function EmployeeFormDialog({
                 <Label>Scheduled End Time</Label>
                 <Input type="time" {...register("scheduledEndTime")} />
               </div>
-              <p className="col-span-2 -mt-1.5 text-xs text-slate-400">
+              <p className="sm:col-span-2 -mt-1.5 text-xs text-slate-400">
                 Leave blank to use the company default schedule.
               </p>
             </div>
@@ -384,8 +384,8 @@ export default function EmployeesPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="relative w-72">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full sm:w-72">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input placeholder="Search employees..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>

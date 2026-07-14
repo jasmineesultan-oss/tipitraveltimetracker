@@ -197,47 +197,86 @@ export default function MyLeavePage() {
 
       {error && <Alert>{error}</Alert>}
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Leave Type</TableHead>
-            <TableHead>Start</TableHead>
-            <TableHead>End</TableHead>
-            <TableHead>Days</TableHead>
-            <TableHead>Reason</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {leaveRequests.map((lr) => (
-            <TableRow key={lr.id}>
-              <TableCell className="font-medium text-slate-900">{lr.leaveType.name}</TableCell>
-              <TableCell>{formatDate(lr.startDate)}</TableCell>
-              <TableCell>{formatDate(lr.endDate)}</TableCell>
-              <TableCell>{lr.totalDays}</TableCell>
-              <TableCell className="max-w-xs truncate">{lr.reason}</TableCell>
-              <TableCell>
-                <Badge variant={leaveStatusVariant[lr.status]}>{lr.status}</Badge>
-              </TableCell>
-              <TableCell>
+      {leaveRequests.length === 0 ? (
+        <p className="rounded-lg border border-slate-200 bg-white py-8 text-center text-slate-400">No leave requests yet</p>
+      ) : (
+        <>
+          {/* Stacked cards on small screens */}
+          <div className="space-y-3 sm:hidden">
+            {leaveRequests.map((lr) => (
+              <div key={lr.id} className="rounded-lg border border-slate-200 bg-white p-4">
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <p className="font-medium text-slate-900">{lr.leaveType.name}</p>
+                  <Badge variant={leaveStatusVariant[lr.status]}>{lr.status}</Badge>
+                </div>
+                <dl className="space-y-1.5 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-500">Start</dt>
+                    <dd className="text-slate-700">{formatDate(lr.startDate)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-500">End</dt>
+                    <dd className="text-slate-700">{formatDate(lr.endDate)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-500">Days</dt>
+                    <dd className="text-slate-700">{lr.totalDays}</dd>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <dt className="text-slate-500">Reason</dt>
+                    <dd className="text-slate-700">{lr.reason}</dd>
+                  </div>
+                </dl>
                 {lr.status === "PENDING" && (
-                  <Button variant="ghost" size="sm" onClick={() => cancelRequest(lr.id)}>
-                    Cancel
-                  </Button>
+                  <div className="mt-2 flex justify-end">
+                    <Button variant="ghost" size="sm" onClick={() => cancelRequest(lr.id)}>
+                      Cancel
+                    </Button>
+                  </div>
                 )}
-              </TableCell>
-            </TableRow>
-          ))}
-          {leaveRequests.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={7} className="py-8 text-center text-slate-400">
-                No leave requests yet
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+              </div>
+            ))}
+          </div>
+
+          {/* Table on sm and above */}
+          <div className="hidden sm:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Leave Type</TableHead>
+                  <TableHead>Start</TableHead>
+                  <TableHead>End</TableHead>
+                  <TableHead>Days</TableHead>
+                  <TableHead>Reason</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {leaveRequests.map((lr) => (
+                  <TableRow key={lr.id}>
+                    <TableCell className="font-medium text-slate-900">{lr.leaveType.name}</TableCell>
+                    <TableCell>{formatDate(lr.startDate)}</TableCell>
+                    <TableCell>{formatDate(lr.endDate)}</TableCell>
+                    <TableCell>{lr.totalDays}</TableCell>
+                    <TableCell className="max-w-xs truncate">{lr.reason}</TableCell>
+                    <TableCell>
+                      <Badge variant={leaveStatusVariant[lr.status]}>{lr.status}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {lr.status === "PENDING" && (
+                        <Button variant="ghost" size="sm" onClick={() => cancelRequest(lr.id)}>
+                          Cancel
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
+      )}
 
       <LeaveRequestDialog open={dialogOpen} onOpenChange={setDialogOpen} leaveTypes={leaveTypes} onSaved={load} />
     </div>
