@@ -88,6 +88,27 @@ router.get(
       averageHours: Math.round((hours.reduce((s, h) => s + h, 0) / hours.length) * 100) / 100,
     }));
 
+    // Attendance by department (today)
+    const activeEmployeesByDept = await prisma.employee.findMany({
+      where: { status: "ACTIVE" },
+      select: { id: true, department: { select: { name: true } } },
+    });
+    const presentEmployeeIdsToday = new Set(
+      todayAttendance.filter((a) => a.timeIn).map((a) => a.employeeId)
+    );
+    const deptStats: Record<string, { present: number; absent: number; total: number }> = {};
+    for (const emp of activeEmployeesByDept) {
+      const deptName = emp.department?.name || "Unassigned";
+      if (!deptStats[deptName]) deptStats[deptName] = { present: 0, absent: 0, total: 0 };
+      deptStats[deptName].total += 1;
+      if (presentEmployeeIdsToday.has(emp.id)) {
+        deptStats[deptName].present += 1;
+      } else {
+        deptStats[deptName].absent += 1;
+      }
+    }
+    const departmentAttendance = Object.entries(deptStats).map(([department, v]) => ({ department, ...v }));
+
     res.json({
       stats: {
         totalEmployees,
@@ -104,6 +125,7 @@ router.get(
         lateEmployees: Object.entries(attendanceByMonth).map(([month, v]) => ({ month, late: v.late })),
         leaveStatistics,
         workingHoursTrend,
+        departmentAttendance,
       },
     });
   })

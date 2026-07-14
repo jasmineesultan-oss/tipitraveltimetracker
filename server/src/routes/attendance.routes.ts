@@ -314,8 +314,8 @@ router.post(
 
     const requestedDayStart = startOfDayUTC(new Date(data.date));
     const todayStart = startOfDayUTC(new Date());
-    if (requestedDayStart.getTime() >= todayStart.getTime()) {
-      throw new ApiError(400, "Attendance corrections can only be submitted for past dates");
+    if (requestedDayStart.getTime() > todayStart.getTime()) {
+      throw new ApiError(400, "Attendance corrections cannot be submitted for future dates");
     }
 
     const employee = await prisma.employee.findUnique({ where: { id: employeeId } });

@@ -13,15 +13,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert } from "@/components/shared/Alert";
 import { PageSpinner } from "@/components/shared/Spinner";
 import { AttendanceCalendar } from "@/components/shared/AttendanceCalendar";
-import { formatDate, formatTime } from "@/lib/utils";
+import { formatDate, formatTime, phLocalToUtcIso } from "@/lib/utils";
 import { attendanceStatusVariant, holidayTypeLabel, workTypeLabel } from "@/lib/statusStyles";
 import type { Attendance, WorkType } from "@/types";
 
 function maxCorrectionDate(): string {
-  const todayPh = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
-  const [y, m, d] = todayPh.split("-").map(Number);
-  const yesterday = new Date(Date.UTC(y, m - 1, d - 1));
-  return yesterday.toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
 }
 
 interface EmployeeDashboardData {
@@ -102,8 +99,8 @@ export default function EmployeeDashboardPage() {
     try {
       await api.post("/attendance/self-correction", {
         date: correctionDate,
-        timeIn: correctionTimeIn ? `${correctionDate}T${correctionTimeIn}:00.000Z` : undefined,
-        timeOut: correctionTimeOut ? `${correctionDate}T${correctionTimeOut}:00.000Z` : undefined,
+        timeIn: correctionTimeIn ? phLocalToUtcIso(correctionDate, correctionTimeIn) : undefined,
+        timeOut: correctionTimeOut ? phLocalToUtcIso(correctionDate, correctionTimeOut) : undefined,
         workType: correctionWorkType,
         notes: correctionNotes || undefined,
       });

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert } from "@/components/shared/Alert";
 import { workTypeLabel } from "@/lib/statusStyles";
+import { phLocalToUtcIso } from "@/lib/utils";
 
 interface ManualEntryFormValues {
   employeeId: string;
@@ -63,8 +64,8 @@ export function ManualAttendanceEntryDialog({
       await api.post("/attendance/manual-entry", {
         employeeId: values.employeeId,
         date: values.date,
-        timeIn: values.timeIn ? `${values.date}T${values.timeIn}:00.000Z` : undefined,
-        timeOut: values.timeOut ? `${values.date}T${values.timeOut}:00.000Z` : undefined,
+        timeIn: values.timeIn ? phLocalToUtcIso(values.date, values.timeIn) : undefined,
+        timeOut: values.timeOut ? phLocalToUtcIso(values.date, values.timeOut) : undefined,
         workType: values.workType,
         notes: values.notes,
       });

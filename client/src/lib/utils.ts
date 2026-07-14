@@ -26,3 +26,15 @@ export function formatMinutes(minutes: number): string {
 export function initials(firstName?: string, lastName?: string): string {
   return `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
 }
+
+/**
+ * Converts a Philippines local wall-clock date+time (as typed into a date/time
+ * input) into the correct UTC instant. Philippines is a fixed UTC+8 offset with
+ * no DST, so this is a simple subtraction rather than a full timezone library.
+ */
+export function phLocalToUtcIso(dateStr: string, timeStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const [h, min] = timeStr.split(":").map(Number);
+  const utcMs = Date.UTC(y, m - 1, d, h, min) - 8 * 60 * 60 * 1000;
+  return new Date(utcMs).toISOString();
+}

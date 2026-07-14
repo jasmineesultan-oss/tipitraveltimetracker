@@ -35,6 +35,7 @@ interface AdminDashboardData {
     lateEmployees: { month: string; late: number }[];
     leaveStatistics: { leaveType: string; totalDays: number }[];
     workingHoursTrend: { date: string; averageHours: number }[];
+    departmentAttendance: { department: string; present: number; absent: number; total: number }[];
   };
 }
 
@@ -132,6 +133,25 @@ export default function AdminDashboardPage() {
                 </PieChart>
               </ResponsiveContainer>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Attendance by Department</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={data.charts.departmentAttendance}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="department" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="present" fill="#059669" name="Present" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="absent" fill="#dc2626" name="Absent" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
