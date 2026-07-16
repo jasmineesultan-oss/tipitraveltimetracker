@@ -1,31 +1,20 @@
 import { useEffect, useState } from "react";
-import { Clock, LogIn, LogOut, CalendarClock, Timer, PartyPopper, Wrench, Pencil, Check } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Clock, LogIn, LogOut, CalendarClock, Timer, PartyPopper, Pencil, Check, ArrowRight } from "lucide-react";
 import { api, apiErrorMessage } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { StatCard } from "@/components/shared/StatCard";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert } from "@/components/shared/Alert";
 import { PageSpinner } from "@/components/shared/Spinner";
 import { AttendanceCalendar } from "@/components/shared/AttendanceCalendar";
-import { cn, formatDate, formatTime, phLocalToUtcIso, utcIsoToPhLocalTime } from "@/lib/utils";
+import { cn, formatDate, formatTime, phLocalToUtcIso, todayPhDateStr, utcIsoToPhLocalTime } from "@/lib/utils";
 import { attendanceStatusVariant, holidayTypeLabel, workTypeLabel } from "@/lib/statusStyles";
 import type { Attendance, WorkType } from "@/types";
-
-function todayPhDateStr(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
-}
-
-function maxCorrectionDate(): string {
-  const [y, m, d] = todayPhDateStr().split("-").map(Number);
-  const yesterday = new Date(Date.UTC(y, m - 1, d - 1));
-  return yesterday.toISOString().slice(0, 10);
-}
 
 interface EmployeeDashboardData {
   todayAttendance: Attendance | null;
@@ -41,16 +30,6 @@ export default function EmployeeDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [workType, setWorkType] = useState<WorkType>("OFFICE");
-
-  const [correctionDate, setCorrectionDate] = useState("");
-  const [correctionTimeIn, setCorrectionTimeIn] = useState("");
-  const [correctionTimeOut, setCorrectionTimeOut] = useState("");
-  const [correctionWorkType, setCorrectionWorkType] = useState<WorkType>("OFFICE");
-  const [correctionNotes, setCorrectionNotes] = useState("");
-  const [correctionError, setCorrectionError] = useState<string | null>(null);
-  const [correctionSuccess, setCorrectionSuccess] = useState(false);
-  const [correctionBusy, setCorrectionBusy] = useState(false);
-  const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
 
   const [editingTimeIn, setEditingTimeIn] = useState(false);
   const [editingTimeOut, setEditingTimeOut] = useState(false);
@@ -138,44 +117,6 @@ export default function EmployeeDashboardPage() {
       setError(apiErrorMessage(err));
     } finally {
       setInlineBusy(false);
-    }
-  }
-
-  async function submitCorrection(e: React.FormEvent) {
-    e.preventDefault();
-    setCorrectionError(null);
-    setCorrectionSuccess(false);
-
-    if (!correctionDate) {
-      setCorrectionError("Select the date you're correcting");
-      return;
-    }
-    if (!correctionTimeIn && !correctionTimeOut) {
-      setCorrectionError("Provide at least a time in or time out");
-      return;
-    }
-
-    setCorrectionBusy(true);
-    try {
-      await api.post("/attendance/self-correction", {
-        date: correctionDate,
-        timeIn: correctionTimeIn ? phLocalToUtcIso(correctionDate, correctionTimeIn) : undefined,
-        timeOut: correctionTimeOut ? phLocalToUtcIso(correctionDate, correctionTimeOut) : undefined,
-        workType: correctionWorkType,
-        notes: correctionNotes || undefined,
-      });
-      setCorrectionSuccess(true);
-      setCorrectionDate("");
-      setCorrectionTimeIn("");
-      setCorrectionTimeOut("");
-      setCorrectionWorkType("OFFICE");
-      setCorrectionNotes("");
-      setCalendarRefreshKey((k) => k + 1);
-      await load();
-    } catch (err) {
-      setCorrectionError(apiErrorMessage(err));
-    } finally {
-      setCorrectionBusy(false);
     }
   }
 
@@ -315,67 +256,10 @@ export default function EmployeeDashboardPage() {
               <LogOut className="h-4 w-4" /> Time Out
             </Button>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Wrench className="h-4 w-4 text-slate-500" />
-            Need to log or fix a past day? Use this form.
-          </CardTitle>
-          <CardDescription>
-            For past dates only - to fix today's Time In / Time Out, edit them directly above.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={submitCorrection} className="space-y-3">
-            {correctionError && <Alert>{correctionError}</Alert>}
-            {correctionSuccess && <Alert variant="success">Correction submitted. Your admin has been notified.</Alert>}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <div className="space-y-1">
-                <Label>Date</Label>
-                <Input
-                  type="date"
-                  max={maxCorrectionDate()}
-                  value={correctionDate}
-                  onChange={(e) => setCorrectionDate(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>Time In</Label>
-                <Input type="time" value={correctionTimeIn} onChange={(e) => setCorrectionTimeIn(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label>Time Out</Label>
-                <Input type="time" value={correctionTimeOut} onChange={(e) => setCorrectionTimeOut(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label>Work Type</Label>
-                <Select value={correctionWorkType} onValueChange={(v) => setCorrectionWorkType(v as WorkType)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="OFFICE">{workTypeLabel.OFFICE}</SelectItem>
-                    <SelectItem value="WORK_FROM_HOME">{workTypeLabel.WORK_FROM_HOME}</SelectItem>
-                    <SelectItem value="FIELD_WORK">{workTypeLabel.FIELD_WORK}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label>Notes</Label>
-              <Textarea
-                value={correctionNotes}
-                onChange={(e) => setCorrectionNotes(e.target.value)}
-                placeholder="e.g. Forgot to time out after client visit"
-              />
-            </div>
-            <Button type="submit" variant="outline" disabled={correctionBusy}>
-              Submit Correction
-            </Button>
-          </form>
+          <Link to="/my-attendance" className="flex items-center gap-1 text-sm text-brand-600 hover:text-brand-700 hover:underline">
+            Need to fix an earlier day? Go to My Attendance
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
         </CardContent>
       </Card>
 
@@ -391,7 +275,7 @@ export default function EmployeeDashboardPage() {
           <CardHeader>
             <CardTitle>Attendance Calendar</CardTitle>
           </CardHeader>
-          <CardContent>{user?.employee && <AttendanceCalendar key={calendarRefreshKey} employeeId={user.employee.id} />}</CardContent>
+          <CardContent>{user?.employee && <AttendanceCalendar employeeId={user.employee.id} />}</CardContent>
         </Card>
 
         <div className="space-y-6">

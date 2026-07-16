@@ -54,3 +54,15 @@ export function utcIsoToPhLocalTime(iso: string): string {
   const minute = parts.find((p) => p.type === "minute")?.value ?? "00";
   return `${hour === "24" ? "00" : hour}:${minute}`;
 }
+
+/** Today's date in Asia/Manila as "YYYY-MM-DD". */
+export function todayPhDateStr(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
+}
+
+/** Yesterday's date in Asia/Manila as "YYYY-MM-DD" - the latest date self-corrections may target. */
+export function maxCorrectionDate(): string {
+  const [y, m, d] = todayPhDateStr().split("-").map(Number);
+  const yesterday = new Date(Date.UTC(y, m - 1, d - 1));
+  return yesterday.toISOString().slice(0, 10);
+}
