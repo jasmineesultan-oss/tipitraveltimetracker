@@ -38,3 +38,19 @@ export function phLocalToUtcIso(dateStr: string, timeStr: string): string {
   const utcMs = Date.UTC(y, m - 1, d, h, min) - 8 * 60 * 60 * 1000;
   return new Date(utcMs).toISOString();
 }
+
+/**
+ * Converts a stored UTC instant back into an "HH:mm" Philippines local wall-clock
+ * string, e.g. for pre-filling a <input type="time"> from an API-returned ISO string.
+ */
+export function utcIsoToPhLocalTime(iso: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Manila",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(iso));
+  const hour = parts.find((p) => p.type === "hour")?.value ?? "00";
+  const minute = parts.find((p) => p.type === "minute")?.value ?? "00";
+  return `${hour === "24" ? "00" : hour}:${minute}`;
+}

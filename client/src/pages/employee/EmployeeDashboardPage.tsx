@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Clock, LogIn, LogOut, CalendarClock, Timer, PartyPopper, Wrench } from "lucide-react";
+import { Clock, LogIn, LogOut, CalendarClock, Timer, PartyPopper, Wrench, Pencil, Check } from "lucide-react";
 import { api, apiErrorMessage } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { StatCard } from "@/components/shared/StatCard";
@@ -13,12 +13,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert } from "@/components/shared/Alert";
 import { PageSpinner } from "@/components/shared/Spinner";
 import { AttendanceCalendar } from "@/components/shared/AttendanceCalendar";
-import { formatDate, formatTime, phLocalToUtcIso } from "@/lib/utils";
+import { cn, formatDate, formatTime, phLocalToUtcIso, utcIsoToPhLocalTime } from "@/lib/utils";
 import { attendanceStatusVariant, holidayTypeLabel, workTypeLabel } from "@/lib/statusStyles";
 import type { Attendance, WorkType } from "@/types";
 
-function maxCorrectionDate(): string {
+function todayPhDateStr(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
+}
+
+function maxCorrectionDate(): string {
+  const [y, m, d] = todayPhDateStr().split("-").map(Number);
+  const yesterday = new Date(Date.UTC(y, m - 1, d - 1));
+  return yesterday.toISOString().slice(0, 10);
 }
 
 interface EmployeeDashboardData {
@@ -45,6 +51,12 @@ export default function EmployeeDashboardPage() {
   const [correctionSuccess, setCorrectionSuccess] = useState(false);
   const [correctionBusy, setCorrectionBusy] = useState(false);
   const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
+
+  const [editingTimeIn, setEditingTimeIn] = useState(false);
+  const [editingTimeOut, setEditingTimeOut] = useState(false);
+  const [timeInDraft, setTimeInDraft] = useState("");
+  const [timeOutDraft, setTimeOutDraft] = useState("");
+  const [inlineBusy, setInlineBusy] = useState(false);
 
   async function load() {
     const { data } = await api.get<EmployeeDashboardData>("/dashboard/employee");
@@ -78,6 +90,54 @@ export default function EmployeeDashboardPage() {
       setError(apiErrorMessage(err));
     } finally {
       setBusy(false);
+    }
+  }
+
+  function startEditTimeIn() {
+    setTimeInDraft(data?.todayAttendance?.timeIn ? utcIsoToPhLocalTime(data.todayAttendance.timeIn) : "");
+    setError(null);
+    setEditingTimeIn(true);
+  }
+
+  function startEditTimeOut() {
+    setTimeOutDraft(data?.todayAttendance?.timeOut ? utcIsoToPhLocalTime(data.todayAttendance.timeOut) : "");
+    setError(null);
+    setEditingTimeOut(true);
+  }
+
+  async function saveInlineTimeIn() {
+    if (!timeInDraft) return;
+    setInlineBusy(true);
+    setError(null);
+    try {
+      await api.post("/attendance/self-correction", {
+        date: todayPhDateStr(),
+        timeIn: phLocalToUtcIso(todayPhDateStr(), timeInDraft),
+      });
+      setEditingTimeIn(false);
+      await load();
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    } finally {
+      setInlineBusy(false);
+    }
+  }
+
+  async function saveInlineTimeOut() {
+    if (!timeOutDraft) return;
+    setInlineBusy(true);
+    setError(null);
+    try {
+      await api.post("/attendance/self-correction", {
+        date: todayPhDateStr(),
+        timeOut: phLocalToUtcIso(todayPhDateStr(), timeOutDraft),
+      });
+      setEditingTimeOut(false);
+      await load();
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    } finally {
+      setInlineBusy(false);
     }
   }
 
@@ -147,13 +207,91 @@ export default function EmployeeDashboardPage() {
               <Alert>{error}</Alert>
             </div>
           )}
-          <div className="flex gap-4 text-sm text-slate-600">
-            <span>
-              Time In: <strong>{formatTime(data.todayAttendance?.timeIn)}</strong>
-            </span>
-            <span>
-              Time Out: <strong>{formatTime(data.todayAttendance?.timeOut)}</strong>
-            </span>
+          <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-slate-600">
+            <div className="flex items-center gap-1.5">
+              <span>Time In:</span>
+              {data.todayAttendance?.timeIn ? (
+                <>
+                  <Input
+                    type="time"
+                    value={editingTimeIn ? timeInDraft : utcIsoToPhLocalTime(data.todayAttendance.timeIn)}
+                    onChange={(e) => setTimeInDraft(e.target.value)}
+                    disabled={!editingTimeIn}
+                    className={cn(
+                      "h-7 w-24 px-2 py-0 text-sm",
+                      !editingTimeIn && "cursor-default border-transparent bg-transparent p-0 font-semibold text-slate-900 shadow-none"
+                    )}
+                  />
+                  {editingTimeIn ? (
+                    <button
+                      type="button"
+                      onClick={saveInlineTimeIn}
+                      disabled={inlineBusy}
+                      className="text-emerald-600 hover:text-emerald-700 disabled:opacity-50"
+                      aria-label="Save Time In"
+                    >
+                      <Check className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={startEditTimeIn}
+                      className="text-slate-400 hover:text-slate-600"
+                      aria-label="Edit Time In"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </>
+              ) : (
+                <strong>{formatTime(data.todayAttendance?.timeIn)}</strong>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span>Time Out:</span>
+              {data.todayAttendance?.timeIn ? (
+                <>
+                  <Input
+                    type="time"
+                    value={
+                      editingTimeOut
+                        ? timeOutDraft
+                        : data.todayAttendance?.timeOut
+                        ? utcIsoToPhLocalTime(data.todayAttendance.timeOut)
+                        : ""
+                    }
+                    onChange={(e) => setTimeOutDraft(e.target.value)}
+                    disabled={!editingTimeOut}
+                    className={cn(
+                      "h-7 w-24 px-2 py-0 text-sm",
+                      !editingTimeOut && "cursor-default border-transparent bg-transparent p-0 font-semibold text-slate-900 shadow-none"
+                    )}
+                  />
+                  {editingTimeOut ? (
+                    <button
+                      type="button"
+                      onClick={saveInlineTimeOut}
+                      disabled={inlineBusy}
+                      className="text-emerald-600 hover:text-emerald-700 disabled:opacity-50"
+                      aria-label="Save Time Out"
+                    >
+                      <Check className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={startEditTimeOut}
+                      className="text-slate-400 hover:text-slate-600"
+                      aria-label="Edit Time Out"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </>
+              ) : (
+                <strong>{formatTime(data.todayAttendance?.timeOut)}</strong>
+              )}
+            </div>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Select value={workType} onValueChange={(v) => setWorkType(v as WorkType)} disabled={!!data.todayAttendance?.timeIn}>
@@ -184,10 +322,10 @@ export default function EmployeeDashboardPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Wrench className="h-4 w-4 text-slate-500" />
-            Missed a punch? Log it here
+            Need to log or fix a past day? Use this form.
           </CardTitle>
           <CardDescription>
-            Manual correction for a past day only - this won't affect today's Time In / Time Out above.
+            For past dates only - to fix today's Time In / Time Out, edit them directly above.
           </CardDescription>
         </CardHeader>
         <CardContent>
