@@ -13,10 +13,10 @@ import { ManualAttendanceEntryDialog } from "@/components/shared/ManualAttendanc
 import { formatDate, formatTime, formatMinutes } from "@/lib/utils";
 import { attendanceStatusVariant, workTypeLabel, workTypeVariant } from "@/lib/statusStyles";
 
-const STATUS_OPTIONS = ["PRESENT", "LATE", "ABSENT", "HALF_DAY", "ON_LEAVE", "HOLIDAY", "WEEKEND"];
+const STATUS_OPTIONS = ["PRESENT", "ABSENT", "HALF_DAY", "ON_LEAVE", "HOLIDAY", "WEEKEND"];
 
-function manualEntrySourceLabel(a: Attendance): string {
-  if (a.manualEntryBy && a.employee?.userId && a.manualEntryBy === a.employee.userId) {
+function sessionSourceLabel(s: { manualEntryBy?: string | null }, employee?: Attendance["employee"]): string {
+  if (s.manualEntryBy && employee?.userId && s.manualEntryBy === employee.userId) {
     return "Self-corrected by employee";
   }
   return "Entered by admin";
@@ -129,11 +129,8 @@ export default function AttendancePage() {
               <TableHead>Employee</TableHead>
               <TableHead>Department</TableHead>
               <TableHead>Date</TableHead>
-              <TableHead>Time In</TableHead>
-              <TableHead>Time Out</TableHead>
+              <TableHead>Sessions</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Work Type</TableHead>
-              <TableHead>Late</TableHead>
               <TableHead>Undertime</TableHead>
               <TableHead>Overtime</TableHead>
               <TableHead>Hours</TableHead>
@@ -143,39 +140,44 @@ export default function AttendancePage() {
           <TableBody>
             {attendances.map((a) => (
               <TableRow key={a.id}>
-                <TableCell className="font-medium text-slate-900">
-                  <div className="flex items-center gap-1.5">
-                    {a.employee?.firstName} {a.employee?.lastName}
-                    {a.isManualEntry && (
-                      <Badge
-                        variant={manualEntrySourceLabel(a) === "Self-corrected by employee" ? "purple" : "outline"}
-                        title={manualEntrySourceLabel(a)}
-                      >
-                        {manualEntrySourceLabel(a)}
-                      </Badge>
-                    )}
+                <TableCell className="align-top font-medium text-slate-900">
+                  {a.employee?.firstName} {a.employee?.lastName}
+                </TableCell>
+                <TableCell className="align-top">{a.employee?.department?.name || "—"}</TableCell>
+                <TableCell className="align-top">{formatDate(a.date)}</TableCell>
+                <TableCell>
+                  <div className="flex flex-col gap-1.5">
+                    {(a.sessions || []).map((s) => (
+                      <div key={s.id} className="flex items-center gap-1.5 text-xs">
+                        <Badge variant={workTypeVariant[s.workType]}>{workTypeLabel[s.workType]}</Badge>
+                        <span className="text-slate-600">
+                          {formatTime(s.timeIn)} - {s.timeOut ? formatTime(s.timeOut) : "in progress"}
+                        </span>
+                        {s.isManualEntry && (
+                          <Badge
+                            variant={sessionSourceLabel(s, a.employee) === "Self-corrected by employee" ? "purple" : "outline"}
+                            title={sessionSourceLabel(s, a.employee)}
+                          >
+                            {sessionSourceLabel(s, a.employee)}
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
+                    {(a.sessions || []).length === 0 && <span className="text-xs text-slate-400">No sessions</span>}
                   </div>
                 </TableCell>
-                <TableCell>{a.employee?.department?.name || "—"}</TableCell>
-                <TableCell>{formatDate(a.date)}</TableCell>
-                <TableCell>{formatTime(a.timeIn)}</TableCell>
-                <TableCell>{formatTime(a.timeOut)}</TableCell>
-                <TableCell>
+                <TableCell className="align-top">
                   <Badge variant={attendanceStatusVariant[a.status]}>{a.status.replace("_", " ")}</Badge>
                 </TableCell>
-                <TableCell>
-                  <Badge variant={workTypeVariant[a.workType]}>{workTypeLabel[a.workType]}</Badge>
-                </TableCell>
-                <TableCell>{formatMinutes(a.lateMinutes)}</TableCell>
-                <TableCell>{formatMinutes(a.undertimeMinutes)}</TableCell>
-                <TableCell>{formatMinutes(a.overtimeMinutes)}</TableCell>
-                <TableCell>{a.totalHours}h</TableCell>
-                <TableCell>{a.holidayName || "—"}</TableCell>
+                <TableCell className="align-top">{formatMinutes(a.undertimeMinutes)}</TableCell>
+                <TableCell className="align-top">{formatMinutes(a.overtimeMinutes)}</TableCell>
+                <TableCell className="align-top">{a.totalHours}h</TableCell>
+                <TableCell className="align-top">{a.holidayName || "—"}</TableCell>
               </TableRow>
             ))}
             {attendances.length === 0 && (
               <TableRow>
-                <TableCell colSpan={12} className="py-8 text-center text-slate-400">
+                <TableCell colSpan={9} className="py-8 text-center text-slate-400">
                   No attendance records found
                 </TableCell>
               </TableRow>

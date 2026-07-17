@@ -35,16 +35,6 @@ export async function findHolidayForDate(date: Date) {
   });
 }
 
-function timeStringToMinutes(hhmm: string): number {
-  const [h, m] = hhmm.split(":").map((n) => parseInt(n, 10));
-  return h * 60 + m;
-}
-
-function minutesSinceMidnightPH(date: Date): number {
-  const shifted = toPhShifted(date);
-  return shifted.getUTCHours() * 60 + shifted.getUTCMinutes();
-}
-
 async function resolveWorkSchedule(employeeId: string) {
   const settings = await getWorkSettings();
   const employee = await prisma.employee.findUnique({
@@ -58,23 +48,22 @@ async function resolveWorkSchedule(employeeId: string) {
   };
 }
 
+/**
+ * Runs once per day, on the first session created for that day: determines
+ * the day-level fields (calendar day, weekend/holiday, initial status).
+ * Late-tracking has been removed - status is only ever PRESENT/WEEKEND/HOLIDAY here.
+ */
 export async function computeTimeIn(employeeId: string, timeIn: Date) {
-  const settings = await resolveWorkSchedule(employeeId);
   const dayStart = startOfDayUTC(timeIn);
   const holiday = await findHolidayForDate(timeIn);
   const weekend = isWeekend(timeIn);
 
-  const expectedStartMinutes = timeStringToMinutes(settings.workStartTime);
-  const actualMinutes = minutesSinceMidnightPH(timeIn);
-  const lateMinutes = Math.max(0, actualMinutes - expectedStartMinutes - settings.gracePeriodMinutes);
-
-  let status: "PRESENT" | "LATE" | "WEEKEND" | "HOLIDAY" = lateMinutes > 0 ? "LATE" : "PRESENT";
+  let status: "PRESENT" | "WEEKEND" | "HOLIDAY" = "PRESENT";
   if (weekend) status = "WEEKEND";
   if (holiday && !weekend) status = "HOLIDAY";
 
   return {
     date: dayStart,
-    lateMinutes,
     isWeekend: weekend,
     status,
     holidayId: holiday?.id ?? null,
@@ -84,77 +73,41 @@ export async function computeTimeIn(employeeId: string, timeIn: Date) {
   };
 }
 
-export async function computeTimeOut(
-  employeeId: string,
-  timeIn: Date,
-  timeOut: Date,
-  breakHours: number,
-  existingStatus: string
-) {
-  const settings = await resolveWorkSchedule(employeeId);
-  const grossHours = (timeOut.getTime() - timeIn.getTime()) / (1000 * 60 * 60);
-  const totalHours = Math.max(0, grossHours - (breakHours || 0));
-
-  const expectedEndMinutes = timeStringToMinutes(settings.workEndTime);
-  const actualOutMinutes = minutesSinceMidnightPH(timeOut);
-
-  const undertimeMinutes = Math.max(0, expectedEndMinutes - actualOutMinutes);
-  const overtimeMinutes = Math.max(0, actualOutMinutes - expectedEndMinutes);
-
-  let status = existingStatus;
-  if (totalHours > 0 && totalHours < settings.halfDayThresholdHours && status !== "WEEKEND" && status !== "HOLIDAY") {
-    status = "HALF_DAY";
-  }
-
-  return {
-    totalHours: Math.round(totalHours * 100) / 100,
-    undertimeMinutes,
-    overtimeMinutes,
-    status,
-  };
-}
-
 /**
- * Shared computation for backfilled attendance (admin manual entry and
- * employee self-correction): runs whichever of timeIn/timeOut is present
- * through computeTimeIn/computeTimeOut so late/undertime/overtime/status
- * stay consistent with a real punch.
+ * Recomputes a day's aggregate totals from all of its sessions. Call this
+ * after any session create/update that has a timeOut, then persist the
+ * returned fields onto the parent Attendance row.
  */
-export async function computeManualAttendanceFields(
-  employeeId: string,
-  timeInDate: Date | null,
-  timeOutDate: Date | null
-) {
-  let fields: Record<string, unknown> = {};
+export async function computeDayAggregate(employeeId: string, attendanceId: string) {
+  const settings = await resolveWorkSchedule(employeeId);
+  const attendance = await prisma.attendance.findUnique({ where: { id: attendanceId } });
+  const sessions = await prisma.attendanceSession.findMany({ where: { attendanceId } });
 
-  if (timeInDate) {
-    const computedIn = await computeTimeIn(employeeId, timeInDate);
-    fields = {
-      ...fields,
-      timeIn: timeInDate,
-      lateMinutes: computedIn.lateMinutes,
-      isWeekend: computedIn.isWeekend,
-      status: computedIn.status,
-      holidayId: computedIn.holidayId,
-      holidayType: computedIn.holidayType,
-      holidayName: computedIn.holidayName,
-      holidayPayClass: computedIn.holidayPayClass,
-    };
-
-    if (timeOutDate) {
-      const computedOut = await computeTimeOut(employeeId, timeInDate, timeOutDate, 0, computedIn.status);
-      fields = {
-        ...fields,
-        timeOut: timeOutDate,
-        totalHours: computedOut.totalHours,
-        undertimeMinutes: computedOut.undertimeMinutes,
-        overtimeMinutes: computedOut.overtimeMinutes,
-        status: computedOut.status,
-      };
+  let totalHours = 0;
+  let hasOpenSession = false;
+  for (const session of sessions) {
+    if (session.timeOut) {
+      const grossHours = (session.timeOut.getTime() - session.timeIn.getTime()) / (1000 * 60 * 60);
+      totalHours += Math.max(0, grossHours - (session.breakHours || 0));
+    } else {
+      hasOpenSession = true;
     }
-  } else if (timeOutDate) {
-    fields = { ...fields, timeOut: timeOutDate };
+  }
+  totalHours = Math.round(totalHours * 100) / 100;
+
+  const targetMinutes = settings.standardWorkHours * 60;
+  const totalMinutes = totalHours * 60;
+  const undertimeMinutes = Math.max(0, Math.round(targetMinutes - totalMinutes));
+  const overtimeMinutes = Math.max(0, Math.round(totalMinutes - targetMinutes));
+
+  let status = attendance?.status ?? "PRESENT";
+  if (status !== "WEEKEND" && status !== "HOLIDAY" && !hasOpenSession) {
+    if (totalHours > 0 && totalHours < settings.halfDayThresholdHours) {
+      status = "HALF_DAY";
+    } else if (totalHours > 0) {
+      status = "PRESENT";
+    }
   }
 
-  return fields;
+  return { totalHours, undertimeMinutes, overtimeMinutes, status };
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Plus, Pencil } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
-import type { Attendance } from "@/types";
+import type { Attendance, AttendanceSession } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,7 @@ export default function MyAttendancePage() {
   const [attendances, setAttendances] = useState<Attendance[] | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAttendance, setEditingAttendance] = useState<Attendance | undefined>(undefined);
+  const [editingSession, setEditingSession] = useState<AttendanceSession | undefined>(undefined);
 
   async function load() {
     if (!user?.employee) return;
@@ -36,11 +37,13 @@ export default function MyAttendancePage() {
 
   function openAddEntry() {
     setEditingAttendance(undefined);
+    setEditingSession(undefined);
     setDialogOpen(true);
   }
 
-  function openEditEntry(a: Attendance) {
+  function openEditEntry(a: Attendance, s: AttendanceSession) {
     setEditingAttendance(a);
+    setEditingSession(s);
     setDialogOpen(true);
   }
 
@@ -77,52 +80,59 @@ export default function MyAttendancePage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead>Time In</TableHead>
-                  <TableHead>Time Out</TableHead>
+                  <TableHead>Sessions</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Work Type</TableHead>
-                  <TableHead>Late</TableHead>
                   <TableHead>Undertime</TableHead>
                   <TableHead>Overtime</TableHead>
                   <TableHead>Hours</TableHead>
                   <TableHead>Holiday</TableHead>
-                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {attendances.map((a) => (
-                  <TableRow key={a.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-1.5">
-                        {formatDate(a.date)}
-                        {a.isManualEntry && <Badge variant="outline">Manual</Badge>}
-                      </div>
-                    </TableCell>
-                    <TableCell>{formatTime(a.timeIn)}</TableCell>
-                    <TableCell>{formatTime(a.timeOut)}</TableCell>
-                    <TableCell>
-                      <Badge variant={attendanceStatusVariant[a.status]}>{a.status.replace("_", " ")}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={workTypeVariant[a.workType]}>{workTypeLabel[a.workType]}</Badge>
-                    </TableCell>
-                    <TableCell>{formatMinutes(a.lateMinutes)}</TableCell>
-                    <TableCell>{formatMinutes(a.undertimeMinutes)}</TableCell>
-                    <TableCell>{formatMinutes(a.overtimeMinutes)}</TableCell>
-                    <TableCell>{a.totalHours}h</TableCell>
-                    <TableCell>{a.holidayName || "—"}</TableCell>
-                    <TableCell>
-                      {toPhDateStr(a.date) < todayPhDateStr() && (
-                        <Button variant="ghost" size="icon" title="Edit" onClick={() => openEditEntry(a)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {attendances.map((a) => {
+                  const isPast = toPhDateStr(a.date) < todayPhDateStr();
+                  const sessions = a.sessions || [];
+                  return (
+                    <TableRow key={a.id}>
+                      <TableCell className="align-top">{formatDate(a.date)}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1.5">
+                          {sessions.map((s) => (
+                            <div key={s.id} className="flex items-center gap-1.5 text-xs">
+                              <Badge variant={workTypeVariant[s.workType]}>{workTypeLabel[s.workType]}</Badge>
+                              <span className="text-slate-600">
+                                {formatTime(s.timeIn)} - {s.timeOut ? formatTime(s.timeOut) : "in progress"}
+                              </span>
+                              {s.isManualEntry && <Badge variant="outline">Manual</Badge>}
+                              {isPast && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  title="Edit"
+                                  onClick={() => openEditEntry(a, s)}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                          {sessions.length === 0 && <span className="text-xs text-slate-400">No sessions</span>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <Badge variant={attendanceStatusVariant[a.status]}>{a.status.replace("_", " ")}</Badge>
+                      </TableCell>
+                      <TableCell className="align-top">{formatMinutes(a.undertimeMinutes)}</TableCell>
+                      <TableCell className="align-top">{formatMinutes(a.overtimeMinutes)}</TableCell>
+                      <TableCell className="align-top">{a.totalHours}h</TableCell>
+                      <TableCell className="align-top">{a.holidayName || "—"}</TableCell>
+                    </TableRow>
+                  );
+                })}
                 {attendances.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={11} className="py-8 text-center text-slate-400">
+                    <TableCell colSpan={7} className="py-8 text-center text-slate-400">
                       No attendance records yet
                     </TableCell>
                   </TableRow>
@@ -137,6 +147,7 @@ export default function MyAttendancePage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         existing={editingAttendance}
+        session={editingSession}
         onSuccess={handleSaved}
       />
     </div>

@@ -19,10 +19,8 @@ const attendanceColumns: ExportColumn[] = [
   { header: "Name", key: "name", width: 22 },
   { header: "Department", key: "department", width: 18 },
   { header: "Date", key: "date", width: 14 },
-  { header: "Time In", key: "timeIn", width: 14 },
-  { header: "Time Out", key: "timeOut", width: 14 },
+  { header: "Sessions", key: "sessions", width: 32 },
   { header: "Status", key: "status", width: 12 },
-  { header: "Late (min)", key: "lateMinutes", width: 10 },
   { header: "Undertime (min)", key: "undertimeMinutes", width: 12 },
   { header: "Overtime (min)", key: "overtimeMinutes", width: 12 },
   { header: "Total Hours", key: "totalHours", width: 10 },
@@ -30,15 +28,20 @@ const attendanceColumns: ExportColumn[] = [
 ];
 
 function mapAttendanceRow(a: any) {
+  const sessions = (a.sessions || [])
+    .map((s: any) => {
+      const inStr = new Date(s.timeIn).toISOString().slice(11, 16);
+      const outStr = s.timeOut ? new Date(s.timeOut).toISOString().slice(11, 16) : "--:--";
+      return `${inStr}-${outStr}`;
+    })
+    .join(", ");
   return {
     employeeCode: a.employee.employeeCode,
     name: `${a.employee.firstName} ${a.employee.lastName}`,
     department: a.employee.department?.name || "",
     date: a.date.toISOString().slice(0, 10),
-    timeIn: a.timeIn ? new Date(a.timeIn).toISOString().slice(11, 16) : "",
-    timeOut: a.timeOut ? new Date(a.timeOut).toISOString().slice(11, 16) : "",
+    sessions,
     status: a.status,
-    lateMinutes: a.lateMinutes,
     undertimeMinutes: a.undertimeMinutes,
     overtimeMinutes: a.overtimeMinutes,
     totalHours: a.totalHours,
@@ -63,7 +66,7 @@ router.get(
         status: (status as any) || undefined,
         employee: departmentId ? { departmentId } : undefined,
       },
-      include: { employee: { include: { department: true } } },
+      include: { employee: { include: { department: true } }, sessions: { orderBy: { timeIn: "asc" } } },
       orderBy: { date: "asc" },
     });
     await exportReport(res, format || "csv", "attendance-report", "Attendance Report", attendanceColumns, attendances.map(mapAttendanceRow));
@@ -154,7 +157,6 @@ const payrollColumns: ExportColumn[] = [
   { header: "Days Present", key: "daysPresent", width: 12 },
   { header: "Total Hours", key: "totalHours", width: 12 },
   { header: "Overtime (hrs)", key: "overtimeHours", width: 12 },
-  { header: "Late (min)", key: "lateMinutes", width: 10 },
   { header: "Undertime (min)", key: "undertimeMinutes", width: 12 },
   { header: "Absences", key: "absences", width: 10 },
   { header: "Approved Leave Days", key: "leaveDays", width: 15 },
@@ -176,10 +178,9 @@ router.get(
         const attendances = await prisma.attendance.findMany({
           where: { employeeId: emp.id, date: dateRangeFilter(startDate, endDate) },
         });
-        const daysPresent = attendances.filter((a) => a.status === "PRESENT" || a.status === "LATE" || a.status === "HALF_DAY").length;
+        const daysPresent = attendances.filter((a) => a.status === "PRESENT" || a.status === "HALF_DAY").length;
         const totalHours = attendances.reduce((s, a) => s + a.totalHours, 0);
         const overtimeMinutes = attendances.reduce((s, a) => s + a.overtimeMinutes, 0);
-        const lateMinutes = attendances.reduce((s, a) => s + a.lateMinutes, 0);
         const undertimeMinutes = attendances.reduce((s, a) => s + a.undertimeMinutes, 0);
         const absences = attendances.filter((a) => a.status === "ABSENT").length;
         const leaveDays = attendances.filter((a) => a.status === "ON_LEAVE").length;
@@ -191,7 +192,6 @@ router.get(
           daysPresent,
           totalHours: Math.round(totalHours * 100) / 100,
           overtimeHours: Math.round((overtimeMinutes / 60) * 100) / 100,
-          lateMinutes,
           undertimeMinutes,
           absences,
           leaveDays,

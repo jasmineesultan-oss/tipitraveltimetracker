@@ -184,34 +184,47 @@ model Attendance {
   employeeId          String
   employee            Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   date                DateTime
-  timeIn              DateTime?
-  timeOut              DateTime?
-  ipAddress           String?
-  device              String?
-  browser             String?
-  gpsLat              Float?
-  gpsLng              Float?
   status              AttendanceStatus  @default(PRESENT)
-  lateMinutes         Int               @default(0)
   undertimeMinutes    Int               @default(0)
   overtimeMinutes     Int               @default(0)
   totalHours          Float             @default(0)
-  breakHours          Float             @default(0)
   isWeekend           Boolean           @default(false)
   holidayId           String?
   holiday             Holiday?          @relation(fields: [holidayId], references: [id], onDelete: SetNull)
   holidayType         HolidayType?
   holidayName         String?
   holidayPayClass     String?
-  workType            WorkType          @default(OFFICE)
-  isManualEntry       Boolean           @default(false)
-  manualEntryBy       String?
   notes               String?
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
 
+  sessions            AttendanceSession[]
+
   @@unique([employeeId, date])
   @@map("attendance")
+}
+
+model AttendanceSession {
+  id            String     @id @default(uuid())
+  attendanceId  String
+  attendance    Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  timeIn        DateTime
+  timeOut       DateTime?
+  workType      WorkType   @default(OFFICE)
+  breakHours    Float      @default(0)
+  ipAddress     String?
+  device        String?
+  browser       String?
+  gpsLat        Float?
+  gpsLng        Float?
+  isManualEntry Boolean    @default(false)
+  manualEntryBy String?
+  notes         String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([attendanceId])
+  @@map("attendance_sessions")
 }
 
 model LeaveTypeModel {

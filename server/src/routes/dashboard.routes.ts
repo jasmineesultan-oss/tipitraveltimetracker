@@ -16,11 +16,10 @@ router.get(
 
     const todayAttendance = await prisma.attendance.findMany({
       where: { date: today },
-      include: { employee: { include: { department: true } } },
+      include: { employee: { include: { department: true } }, sessions: true },
     });
 
     const present = todayAttendance.filter((a) => a.status === "PRESENT" || a.status === "HALF_DAY").length;
-    const late = todayAttendance.filter((a) => a.status === "LATE").length;
     const onLeaveToday = todayAttendance.filter((a) => a.status === "ON_LEAVE").length;
     const presentEmployeeIds = new Set(todayAttendance.map((a) => a.employeeId));
     const absent = Math.max(0, totalEmployees - presentEmployeeIds.size);
@@ -94,7 +93,7 @@ router.get(
       select: { id: true, department: { select: { name: true } } },
     });
     const presentEmployeeIdsToday = new Set(
-      todayAttendance.filter((a) => a.timeIn).map((a) => a.employeeId)
+      todayAttendance.filter((a) => a.sessions.length > 0).map((a) => a.employeeId)
     );
     const deptStats: Record<string, { present: number; absent: number; total: number }> = {};
     for (const emp of activeEmployeesByDept) {
@@ -114,7 +113,6 @@ router.get(
         totalEmployees,
         present,
         absent,
-        late,
         onLeave: onLeaveToday,
       },
       upcomingHolidays,
@@ -122,7 +120,6 @@ router.get(
       recentAttendance,
       charts: {
         attendancePerMonth: Object.entries(attendanceByMonth).map(([month, v]) => ({ month, ...v })),
-        lateEmployees: Object.entries(attendanceByMonth).map(([month, v]) => ({ month, late: v.late })),
         leaveStatistics,
         workingHoursTrend,
         departmentAttendance,
@@ -139,7 +136,10 @@ router.get(
     if (!employeeId) throw new ApiError(400, "No employee profile linked to this account");
 
     const today = startOfDayUTC(new Date());
-    const todayAttendance = await prisma.attendance.findUnique({ where: { employeeId_date: { employeeId, date: today } } });
+    const todayAttendance = await prisma.attendance.findUnique({
+      where: { employeeId_date: { employeeId, date: today } },
+      include: { sessions: { orderBy: { timeIn: "asc" } } },
+    });
 
     const startOfWeek = new Date(today);
     startOfWeek.setUTCDate(today.getUTCDate() - today.getUTCDay());

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { api, apiErrorMessage } from "@/lib/api";
-import type { Employee, WorkType } from "@/types";
+import type { Attendance, AttendanceSession, Employee, WorkType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert } from "@/components/shared/Alert";
 import { workTypeLabel } from "@/lib/statusStyles";
-import { phLocalToUtcIso } from "@/lib/utils";
+import { phLocalToUtcIso, utcIsoToPhLocalTime } from "@/lib/utils";
 
 interface ManualEntryFormValues {
   employeeId: string;
@@ -21,30 +21,51 @@ interface ManualEntryFormValues {
   notes?: string;
 }
 
+function dateToPhDateStr(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(iso));
+}
+
 export function ManualAttendanceEntryDialog({
   open,
   onOpenChange,
   employees,
   onSaved,
   preselectedEmployeeId,
+  existing,
+  session,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   employees: Employee[];
   onSaved: () => void;
   preselectedEmployeeId?: string;
+  existing?: Attendance;
+  session?: AttendanceSession;
 }) {
   const { register, handleSubmit, reset, watch, setValue, formState } = useForm<ManualEntryFormValues>();
   const [employeeSearch, setEmployeeSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  const isEditing = !!session;
+
   useEffect(() => {
     if (open) {
-      reset({ employeeId: preselectedEmployeeId, date: "", timeIn: "", timeOut: "", workType: "OFFICE", notes: "" });
+      if (existing && session) {
+        reset({
+          employeeId: existing.employeeId,
+          date: dateToPhDateStr(existing.date),
+          timeIn: utcIsoToPhLocalTime(session.timeIn),
+          timeOut: session.timeOut ? utcIsoToPhLocalTime(session.timeOut) : "",
+          workType: session.workType,
+          notes: session.notes || "",
+        });
+      } else {
+        reset({ employeeId: preselectedEmployeeId, date: "", timeIn: "", timeOut: "", workType: "OFFICE", notes: "" });
+      }
       setEmployeeSearch("");
       setError(null);
     }
-  }, [open, preselectedEmployeeId, reset]);
+  }, [open, preselectedEmployeeId, existing, session, reset]);
 
   const filteredEmployees = employees.filter((e) => {
     const term = employeeSearch.trim().toLowerCase();
@@ -56,7 +77,8 @@ export function ManualAttendanceEntryDialog({
     );
   });
 
-  const preselectedEmployee = preselectedEmployeeId ? employees.find((e) => e.id === preselectedEmployeeId) : undefined;
+  const lockedEmployeeId = isEditing ? existing?.employeeId : preselectedEmployeeId;
+  const preselectedEmployee = lockedEmployeeId ? employees.find((e) => e.id === lockedEmployeeId) : undefined;
 
   async function onSubmit(values: ManualEntryFormValues) {
     setError(null);
@@ -64,6 +86,7 @@ export function ManualAttendanceEntryDialog({
       await api.post("/attendance/manual-entry", {
         employeeId: values.employeeId,
         date: values.date,
+        sessionId: session?.id,
         timeIn: values.timeIn ? phLocalToUtcIso(values.date, values.timeIn) : undefined,
         timeOut: values.timeOut ? phLocalToUtcIso(values.date, values.timeOut) : undefined,
         workType: values.workType,
@@ -80,7 +103,7 @@ export function ManualAttendanceEntryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Manual Attendance Entry</DialogTitle>
+          <DialogTitle>{isEditing ? "Edit Attendance Session" : "Manual Attendance Entry"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
           {error && <Alert>{error}</Alert>}
@@ -118,7 +141,7 @@ export function ManualAttendanceEntryDialog({
           </div>
           <div className="space-y-1">
             <Label>Date</Label>
-            <Input type="date" {...register("date", { required: true })} />
+            <Input type="date" disabled={isEditing} {...register("date", { required: true })} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">

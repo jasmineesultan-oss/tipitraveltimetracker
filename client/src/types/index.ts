@@ -1,6 +1,6 @@
 export type Role = "ADMIN" | "EMPLOYEE";
 export type EmployeeStatus = "ACTIVE" | "INACTIVE" | "TERMINATED" | "ON_LEAVE";
-export type AttendanceStatus = "PRESENT" | "LATE" | "ABSENT" | "HALF_DAY" | "ON_LEAVE" | "HOLIDAY" | "WEEKEND";
+export type AttendanceStatus = "PRESENT" | "ABSENT" | "HALF_DAY" | "ON_LEAVE" | "HOLIDAY" | "WEEKEND";
 export type HolidayType = "REGULAR" | "SPECIAL_NON_WORKING" | "SPECIAL_WORKING" | "LOCAL";
 export type WorkType = "OFFICE" | "WORK_FROM_HOME" | "FIELD_WORK";
 export type Gender = "MALE" | "FEMALE";
@@ -70,33 +70,34 @@ export interface AuthUser {
   } | null;
 }
 
+export interface AttendanceSession {
+  id: string;
+  attendanceId: string;
+  timeIn: string;
+  timeOut?: string | null;
+  workType: WorkType;
+  breakHours: number;
+  isManualEntry: boolean;
+  manualEntryBy?: string | null;
+  notes?: string | null;
+}
+
 export interface Attendance {
   id: string;
   employeeId: string;
   employee?: Employee;
   date: string;
-  timeIn?: string | null;
-  timeOut?: string | null;
-  ipAddress?: string | null;
-  device?: string | null;
-  browser?: string | null;
-  gpsLat?: number | null;
-  gpsLng?: number | null;
   status: AttendanceStatus;
-  lateMinutes: number;
   undertimeMinutes: number;
   overtimeMinutes: number;
   totalHours: number;
-  breakHours: number;
   isWeekend: boolean;
   holidayId?: string | null;
   holidayType?: HolidayType | null;
   holidayName?: string | null;
   holidayPayClass?: string | null;
-  workType: WorkType;
-  isManualEntry: boolean;
-  manualEntryBy?: string | null;
   notes?: string | null;
+  sessions?: AttendanceSession[];
 }
 
 export interface Holiday {

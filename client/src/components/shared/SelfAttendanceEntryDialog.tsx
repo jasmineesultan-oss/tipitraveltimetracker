@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { api, apiErrorMessage } from "@/lib/api";
-import type { Attendance, WorkType } from "@/types";
+import type { Attendance, AttendanceSession, WorkType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,11 +28,13 @@ export function SelfAttendanceEntryDialog({
   open,
   onOpenChange,
   existing,
+  session,
   onSuccess,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   existing?: Attendance;
+  session?: AttendanceSession;
   onSuccess: () => void;
 }) {
   const { register, handleSubmit, reset, watch, setValue, formState } = useForm<SelfEntryFormValues>();
@@ -40,26 +42,27 @@ export function SelfAttendanceEntryDialog({
 
   useEffect(() => {
     if (open) {
-      if (existing) {
+      if (existing && session) {
         reset({
           date: dateToPhDateStr(existing.date),
-          timeIn: existing.timeIn ? utcIsoToPhLocalTime(existing.timeIn) : "",
-          timeOut: existing.timeOut ? utcIsoToPhLocalTime(existing.timeOut) : "",
-          workType: existing.workType,
-          notes: existing.notes || "",
+          timeIn: utcIsoToPhLocalTime(session.timeIn),
+          timeOut: session.timeOut ? utcIsoToPhLocalTime(session.timeOut) : "",
+          workType: session.workType,
+          notes: session.notes || "",
         });
       } else {
         reset({ date: "", timeIn: "", timeOut: "", workType: "OFFICE", notes: "" });
       }
       setError(null);
     }
-  }, [open, existing, reset]);
+  }, [open, existing, session, reset]);
 
   async function onSubmit(values: SelfEntryFormValues) {
     setError(null);
     try {
       await api.post("/attendance/self-correction", {
         date: values.date,
+        sessionId: session?.id,
         timeIn: values.timeIn ? phLocalToUtcIso(values.date, values.timeIn) : undefined,
         timeOut: values.timeOut ? phLocalToUtcIso(values.date, values.timeOut) : undefined,
         workType: values.workType,
@@ -71,17 +74,19 @@ export function SelfAttendanceEntryDialog({
     }
   }
 
+  const isEditing = !!session;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{existing ? "Edit Attendance Entry" : "Log Past Attendance"}</DialogTitle>
+          <DialogTitle>{isEditing ? "Edit Attendance Session" : "Log Past Attendance"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
           {error && <Alert>{error}</Alert>}
           <div className="space-y-1">
             <Label>Date</Label>
-            <Input type="date" max={maxCorrectionDate()} disabled={!!existing} {...register("date", { required: true })} />
+            <Input type="date" max={maxCorrectionDate()} disabled={isEditing} {...register("date", { required: true })} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
