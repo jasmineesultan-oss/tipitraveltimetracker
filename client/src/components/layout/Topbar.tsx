@@ -12,7 +12,9 @@ export function Topbar({ title }: { title: string }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const links = user?.role === "ADMIN" ? adminLinks : employeeLinks;
+  const links = (user?.role === "ADMIN" ? adminLinks : employeeLinks).filter(
+    (link) => !link.requiresEmployeeProfile || !!user?.employee
+  );
 
   async function onLogout() {
     await logout();

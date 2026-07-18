@@ -35,7 +35,7 @@ function LeaveRequestDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   leaveTypes: LeaveType[];
-  onSaved: () => void;
+  onSaved: (leaveRequest: LeaveRequest) => void;
 }) {
   const { register, handleSubmit, reset, watch, setValue, formState } = useForm<LeaveFormValues>();
   const [file, setFile] = useState<File | null>(null);
@@ -61,8 +61,8 @@ function LeaveRequestDialog({
       formData.append("reason", values.reason);
       formData.append("isPlanned", String(values.isPlanned));
       if (file) formData.append("attachment", file);
-      await api.post("/leave-requests", formData, { headers: { "Content-Type": "multipart/form-data" } });
-      onSaved();
+      const res = await api.post<LeaveRequest>("/leave-requests", formData, { headers: { "Content-Type": "multipart/form-data" } });
+      onSaved(res.data);
       onOpenChange(false);
     } catch (err) {
       setError(apiErrorMessage(err));
@@ -141,11 +141,12 @@ export default function MyLeavePage() {
   const [balances, setBalances] = useState<LeaveBalance[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   async function load() {
     if (!user?.employee) return;
     const [lr, lt, bal] = await Promise.all([
-      api.get<LeaveRequest[]>("/leave-requests"),
+      api.get<LeaveRequest[]>("/leave-requests", { params: { employeeId: user.employee.id } }),
       api.get<LeaveType[]>("/leave-types"),
       api.get<LeaveBalance[]>(`/leave-requests/balances/${user.employee.id}`),
     ]);
@@ -162,12 +163,26 @@ export default function MyLeavePage() {
   async function cancelRequest(id: string) {
     if (!confirm("Cancel this leave request?")) return;
     setError(null);
+    setSuccessMessage(null);
     try {
       await api.put(`/leave-requests/${id}/cancel`);
       load();
     } catch (err) {
       setError(apiErrorMessage(err));
     }
+  }
+
+  function openRequestDialog() {
+    setError(null);
+    setSuccessMessage(null);
+    setDialogOpen(true);
+  }
+
+  async function handleLeaveSaved(leaveRequest: LeaveRequest) {
+    setSuccessMessage(
+      leaveRequest.status === "APPROVED" ? "Leave approved and added to your calendar." : "Leave request submitted for approval."
+    );
+    await load();
   }
 
   if (!leaveRequests) return <PageSpinner />;
@@ -190,11 +205,12 @@ export default function MyLeavePage() {
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={() => setDialogOpen(true)}>
+        <Button onClick={openRequestDialog}>
           <Plus className="h-4 w-4" /> Request Leave
         </Button>
       </div>
 
+      {successMessage && <Alert variant="success">{successMessage}</Alert>}
       {error && <Alert>{error}</Alert>}
 
       {leaveRequests.length === 0 ? (
@@ -278,7 +294,7 @@ export default function MyLeavePage() {
         </>
       )}
 
-      <LeaveRequestDialog open={dialogOpen} onOpenChange={setDialogOpen} leaveTypes={leaveTypes} onSaved={load} />
+      <LeaveRequestDialog open={dialogOpen} onOpenChange={setDialogOpen} leaveTypes={leaveTypes} onSaved={handleLeaveSaved} />
     </div>
   );
 }

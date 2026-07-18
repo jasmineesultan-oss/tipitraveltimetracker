@@ -6,7 +6,9 @@ import { adminLinks, employeeLinks } from "@/lib/navLinks";
 
 export function Sidebar() {
   const { user } = useAuth();
-  const links = user?.role === "ADMIN" ? adminLinks : employeeLinks;
+  const links = (user?.role === "ADMIN" ? adminLinks : employeeLinks).filter(
+    (link) => !link.requiresEmployeeProfile || !!user?.employee
+  );
 
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { asyncHandler, ApiError } from "../middleware/errorHandler";
@@ -20,6 +21,46 @@ function countLeaveDays(start: Date, end: Date): number {
     cur.setUTCDate(cur.getUTCDate() + 1);
   }
   return count;
+}
+
+/**
+ * Shared effects of approving a leave request: deduct the balance and mark the
+ * affected weekdays as ON_LEAVE in attendance. Used both when an admin approves a
+ * pending request and when an admin's own submission is auto-approved on creation.
+ */
+async function applyLeaveApprovalEffects(
+  tx: Prisma.TransactionClient,
+  leaveRequest: { employeeId: string; leaveTypeId: string; startDate: Date; endDate: Date; totalDays: number }
+) {
+  const year = leaveRequest.startDate.getUTCFullYear();
+  const balance = await tx.leaveBalance.findUnique({
+    where: { employeeId_leaveTypeId_year: { employeeId: leaveRequest.employeeId, leaveTypeId: leaveRequest.leaveTypeId, year } },
+  });
+  if (balance) {
+    await tx.leaveBalance.update({ where: { id: balance.id }, data: { usedDays: balance.usedDays + leaveRequest.totalDays } });
+  }
+
+  const cur = new Date(startOfDayUTC(leaveRequest.startDate));
+  const last = startOfDayUTC(leaveRequest.endDate);
+  while (cur.getTime() <= last.getTime()) {
+    if (!isWeekend(cur)) {
+      const holiday = await findHolidayForDate(cur);
+      await tx.attendance.upsert({
+        where: { employeeId_date: { employeeId: leaveRequest.employeeId, date: new Date(cur) } },
+        update: { status: "ON_LEAVE" },
+        create: {
+          employeeId: leaveRequest.employeeId,
+          date: new Date(cur),
+          status: "ON_LEAVE",
+          isWeekend: false,
+          holidayId: holiday?.id ?? null,
+          holidayType: holiday?.type ?? null,
+          holidayName: holiday?.name ?? null,
+        },
+      });
+    }
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
 }
 
 router.get(
@@ -59,11 +100,9 @@ router.get(
     const y = year ? parseInt(year, 10) : now.getUTCFullYear();
     const m = month ? parseInt(month, 10) - 1 : now.getUTCMonth();
 
-    const targetEmployeeId = req.user!.role === "ADMIN" ? employeeId : req.user!.employeeId;
-
     const leaveRequests = await prisma.leaveRequest.findMany({
       where: {
-        employeeId: targetEmployeeId || undefined,
+        employeeId: employeeId || undefined,
         startDate: { lt: new Date(Date.UTC(y, m + 1, 1)) },
         endDate: { gte: new Date(Date.UTC(y, m, 1)) },
         status: { not: "CANCELLED" },
@@ -108,6 +147,8 @@ router.post(
 
     const attachmentUrl = req.file ? await uploadToBlob(req.file) : undefined;
 
+    const isAdminSelfSubmission = req.user!.role === "ADMIN" && employeeId === req.user!.employeeId;
+
     const leaveRequest = await prisma.leaveRequest.create({
       data: {
         employeeId,
@@ -118,19 +159,26 @@ router.post(
         reason: data.reason,
         attachmentUrl,
         isPlanned: data.isPlanned || false,
-        status: "PENDING",
+        ...(isAdminSelfSubmission
+          ? { status: "APPROVED" as const, approvedById: employeeId, approvedAt: new Date() }
+          : { status: "PENDING" as const }),
       },
       include: { employee: true, leaveType: true },
     });
 
-    await logAudit({ userId: req.user!.userId, action: "LEAVE_SUBMITTED", entityType: "LeaveRequest", entityId: leaveRequest.id, ipAddress: req.ip });
-    await notifyAllAdmins({
-      type: "LEAVE_SUBMITTED",
-      title: "New Leave Request",
-      message: `${leaveRequest.employee.firstName} ${leaveRequest.employee.lastName} submitted a ${leaveType.name} request.`,
-      relatedEntityType: "LeaveRequest",
-      relatedEntityId: leaveRequest.id,
-    });
+    if (isAdminSelfSubmission) {
+      await prisma.$transaction((tx) => applyLeaveApprovalEffects(tx, leaveRequest), { timeout: 15000 });
+      await logAudit({ userId: req.user!.userId, action: "LEAVE_APPROVED", entityType: "LeaveRequest", entityId: leaveRequest.id, ipAddress: req.ip });
+    } else {
+      await logAudit({ userId: req.user!.userId, action: "LEAVE_SUBMITTED", entityType: "LeaveRequest", entityId: leaveRequest.id, ipAddress: req.ip });
+      await notifyAllAdmins({
+        type: "LEAVE_SUBMITTED",
+        title: "New Leave Request",
+        message: `${leaveRequest.employee.firstName} ${leaveRequest.employee.lastName} submitted a ${leaveType.name} request.`,
+        relatedEntityType: "LeaveRequest",
+        relatedEntityId: leaveRequest.id,
+      });
+    }
 
     res.status(201).json(leaveRequest);
   })
@@ -173,37 +221,7 @@ router.put(
         where: { id: req.params.id },
         data: { status: "APPROVED", approvedById: approverEmployee?.id, approvedAt: new Date() },
       });
-
-      const year = leaveRequest.startDate.getUTCFullYear();
-      const balance = await tx.leaveBalance.findUnique({
-        where: { employeeId_leaveTypeId_year: { employeeId: leaveRequest.employeeId, leaveTypeId: leaveRequest.leaveTypeId, year } },
-      });
-      if (balance) {
-        await tx.leaveBalance.update({ where: { id: balance.id }, data: { usedDays: balance.usedDays + leaveRequest.totalDays } });
-      }
-
-      const cur = new Date(startOfDayUTC(leaveRequest.startDate));
-      const last = startOfDayUTC(leaveRequest.endDate);
-      while (cur.getTime() <= last.getTime()) {
-        if (!isWeekend(cur)) {
-          const holiday = await findHolidayForDate(cur);
-          await tx.attendance.upsert({
-            where: { employeeId_date: { employeeId: leaveRequest.employeeId, date: new Date(cur) } },
-            update: { status: "ON_LEAVE" },
-            create: {
-              employeeId: leaveRequest.employeeId,
-              date: new Date(cur),
-              status: "ON_LEAVE",
-              isWeekend: false,
-              holidayId: holiday?.id ?? null,
-              holidayType: holiday?.type ?? null,
-              holidayName: holiday?.name ?? null,
-            },
-          });
-        }
-        cur.setUTCDate(cur.getUTCDate() + 1);
-      }
-
+      await applyLeaveApprovalEffects(tx, leaveRequest);
       return lr;
     }, { timeout: 15000 });
 

@@ -19,6 +19,8 @@ export interface NavLinkItem {
   label: string;
   icon: LucideIcon;
   end?: boolean;
+  /** Only show this link to users who have a linked employee profile (e.g. an admin without one). */
+  requiresEmployeeProfile?: boolean;
 }
 
 export const adminLinks: NavLinkItem[] = [
@@ -26,6 +28,7 @@ export const adminLinks: NavLinkItem[] = [
   { to: "/attendance", label: "Attendance", icon: Clock },
   { to: "/leave-requests", label: "Leave Requests", icon: CalendarCheck2 },
   { to: "/leave-calendar", label: "Leave Calendar", icon: CalendarDays },
+  { to: "/my-leave", label: "My Leave", icon: CalendarCheck2, requiresEmployeeProfile: true },
   { to: "/employees", label: "Employees", icon: Users },
   { to: "/departments", label: "Departments", icon: Building2 },
   { to: "/holidays", label: "Holidays", icon: PartyPopper },
