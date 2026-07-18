@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Users, UserCheck, UserX, Clock3, CalendarClock, PartyPopper } from "lucide-react";
+import { Users, UserCheck, UserX, CalendarClock, PartyPopper } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -16,23 +16,24 @@ import {
   Legend,
 } from "recharts";
 import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { StatCard } from "@/components/shared/StatCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageSpinner } from "@/components/shared/Spinner";
 import { Badge } from "@/components/ui/badge";
+import { MyTimeTrackingCard } from "@/components/shared/MyTimeTrackingCard";
 import { formatDate } from "@/lib/utils";
 import { holidayTypeLabel } from "@/lib/statusStyles";
 
 const COLORS = ["#2563eb", "#7c3aed", "#059669", "#d97706", "#dc2626", "#0891b2"];
 
 interface AdminDashboardData {
-  stats: { totalEmployees: number; present: number; absent: number; late: number; onLeave: number };
+  stats: { totalEmployees: number; present: number; absent: number; onLeave: number };
   upcomingHolidays: any[];
   upcomingLeaveRequests: any[];
   recentAttendance: any[];
   charts: {
     attendancePerMonth: { month: string; present: number; late: number; absent: number }[];
-    lateEmployees: { month: string; late: number }[];
     leaveStatistics: { leaveType: string; totalDays: number }[];
     workingHoursTrend: { date: string; averageHours: number }[];
     departmentAttendance: { department: string; present: number; absent: number; total: number }[];
@@ -40,6 +41,7 @@ interface AdminDashboardData {
 }
 
 export default function AdminDashboardPage() {
+  const { user } = useAuth();
   const [data, setData] = useState<AdminDashboardData | null>(null);
 
   useEffect(() => {
@@ -50,11 +52,12 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      {user?.employee && <MyTimeTrackingCard />}
+
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Total Employees" value={data.stats.totalEmployees} icon={Users} accent="slate" />
         <StatCard label="Present Today" value={data.stats.present} icon={UserCheck} accent="emerald" />
         <StatCard label="Absent Today" value={data.stats.absent} icon={UserX} accent="red" />
-        <StatCard label="Late Today" value={data.stats.late} icon={Clock3} accent="amber" />
         <StatCard label="On Leave" value={data.stats.onLeave} icon={CalendarClock} accent="purple" />
       </div>
 
@@ -72,7 +75,6 @@ export default function AdminDashboardPage() {
                 <Tooltip />
                 <Legend />
                 <Bar dataKey="present" fill="#059669" name="Present" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="late" fill="#d97706" name="Late" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="absent" fill="#dc2626" name="Absent" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -92,23 +94,6 @@ export default function AdminDashboardPage() {
                 <Tooltip />
                 <Line type="monotone" dataKey="averageHours" stroke="#2563eb" strokeWidth={2} name="Avg Hours" />
               </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Late Employees Trend</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={data.charts.lateEmployees}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Bar dataKey="late" fill="#d97706" name="Late" radius={[4, 4, 0, 0]} />
-              </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
