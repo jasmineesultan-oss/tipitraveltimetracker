@@ -422,6 +422,55 @@ router.post(
   })
 );
 
+router.delete(
+  "/session/:sessionId",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const session = await prisma.attendanceSession.findUnique({
+      where: { id: req.params.sessionId },
+      include: { attendance: { include: { employee: true } } },
+    });
+    if (!session) throw new ApiError(404, "Attendance session not found");
+
+    const isAdmin = req.user!.role === "ADMIN";
+    const isOwnPastSession =
+      session.attendance.employeeId === req.user!.employeeId &&
+      startOfDayUTC(session.attendance.date).getTime() < startOfDayUTC(new Date()).getTime();
+
+    if (!isAdmin && !isOwnPastSession) {
+      throw new ApiError(403, "Forbidden");
+    }
+
+    const attendanceId = session.attendance.id;
+    const employeeId = session.attendance.employeeId;
+
+    await prisma.attendanceSession.delete({ where: { id: session.id } });
+
+    const remainingCount = await prisma.attendanceSession.count({ where: { attendanceId } });
+    if (remainingCount === 0) {
+      await prisma.attendance.delete({ where: { id: attendanceId } });
+    } else {
+      await refreshAttendanceAggregate(employeeId, attendanceId);
+    }
+
+    const dateLabel = session.attendance.date.toISOString().slice(0, 10);
+    const timeInLabel = session.timeIn.toISOString().slice(11, 16);
+    const timeOutLabel = session.timeOut ? session.timeOut.toISOString().slice(11, 16) : "in progress";
+    const isOwnSession = session.attendance.employeeId === req.user!.employeeId;
+
+    await logAudit({
+      userId: req.user!.userId,
+      action: isOwnSession ? "ATTENDANCE_SELF_CORRECTION" : "ADMIN_ACTION",
+      entityType: "Attendance",
+      entityId: attendanceId,
+      details: `Deleted attendance session for ${session.attendance.employee.firstName} ${session.attendance.employee.lastName} on ${dateLabel} (${timeInLabel}-${timeOutLabel})`,
+      ipAddress: req.ip,
+    });
+
+    res.json({ success: true });
+  })
+);
+
 router.post(
   "/check-missing-timeouts",
   requireAuth,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { PlusCircle } from "lucide-react";
-import { api } from "@/lib/api";
+import { PlusCircle, Trash2 } from "lucide-react";
+import { api, apiErrorMessage } from "@/lib/api";
 import type { Attendance, Department, Employee } from "@/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageSpinner } from "@/components/shared/Spinner";
+import { Alert } from "@/components/shared/Alert";
 import { ManualAttendanceEntryDialog } from "@/components/shared/ManualAttendanceEntryDialog";
 import { formatDate, formatTime, formatMinutes } from "@/lib/utils";
 import { attendanceStatusVariant, workTypeLabel, workTypeVariant } from "@/lib/statusStyles";
@@ -28,6 +29,7 @@ export default function AttendancePage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filters, setFilters] = useState<{ departmentId?: string; employeeId?: string; status?: string; startDate?: string; endDate?: string }>({});
   const [manualEntryOpen, setManualEntryOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api.get<Department[]>("/departments").then((res) => setDepartments(res.data));
@@ -53,6 +55,17 @@ export default function AttendancePage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
+
+  async function deleteSession(sessionId: string) {
+    if (!confirm("Delete this attendance entry? This cannot be undone.")) return;
+    setError(null);
+    try {
+      await api.delete(`/attendance/session/${sessionId}`);
+      load();
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -120,6 +133,8 @@ export default function AttendancePage() {
         </Button>
       </div>
 
+      {error && <Alert>{error}</Alert>}
+
       {!attendances ? (
         <PageSpinner />
       ) : (
@@ -161,6 +176,15 @@ export default function AttendancePage() {
                             {sessionSourceLabel(s, a.employee)}
                           </Badge>
                         )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          title="Delete"
+                          onClick={() => deleteSession(s.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                        </Button>
                       </div>
                     ))}
                     {(a.sessions || []).length === 0 && <span className="text-xs text-slate-400">No sessions</span>}

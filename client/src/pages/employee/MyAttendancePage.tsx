@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { api } from "@/lib/api";
+import { api, apiErrorMessage } from "@/lib/api";
 import type { Attendance, AttendanceSession } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AttendanceCalendar } from "@/components/shared/AttendanceCalendar";
 import { SelfAttendanceEntryDialog } from "@/components/shared/SelfAttendanceEntryDialog";
+import { Alert } from "@/components/shared/Alert";
 import { PageSpinner } from "@/components/shared/Spinner";
 import { formatDate, formatTime, formatMinutes, todayPhDateStr } from "@/lib/utils";
 import { attendanceStatusVariant, workTypeLabel, workTypeVariant } from "@/lib/statusStyles";
@@ -23,6 +24,7 @@ export default function MyAttendancePage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAttendance, setEditingAttendance] = useState<Attendance | undefined>(undefined);
   const [editingSession, setEditingSession] = useState<AttendanceSession | undefined>(undefined);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
     if (!user?.employee) return;
@@ -52,6 +54,17 @@ export default function MyAttendancePage() {
     await load();
   }
 
+  async function deleteSession(sessionId: string) {
+    if (!confirm("Delete this attendance entry? This cannot be undone.")) return;
+    setError(null);
+    try {
+      await api.delete(`/attendance/session/${sessionId}`);
+      await load();
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    }
+  }
+
   if (!user?.employee) return null;
 
   return (
@@ -73,6 +86,11 @@ export default function MyAttendancePage() {
           </Button>
         </CardHeader>
         <CardContent>
+          {error && (
+            <div className="mb-3">
+              <Alert>{error}</Alert>
+            </div>
+          )}
           {!attendances ? (
             <PageSpinner />
           ) : (
@@ -105,15 +123,26 @@ export default function MyAttendancePage() {
                               </span>
                               {s.isManualEntry && <Badge variant="outline">Manual</Badge>}
                               {isPast && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  title="Edit"
-                                  onClick={() => openEditEntry(a, s)}
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </Button>
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    title="Edit"
+                                    onClick={() => openEditEntry(a, s)}
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    title="Delete"
+                                    onClick={() => deleteSession(s.id)}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                                  </Button>
+                                </>
                               )}
                             </div>
                           ))}
