@@ -146,6 +146,31 @@ async function main() {
     { key: "STANDARD_WORK_HOURS", value: "8", description: "Standard working hours per day" },
     { key: "HALF_DAY_THRESHOLD_HOURS", value: "4", description: "Hours below which a full day counts as half day" },
     { key: "COMPANY_NAME", value: "TIPI", description: "Company name shown across the app" },
+    {
+      key: "HOLIDAY_REGULAR_WORKED_PCT",
+      value: "200",
+      description: "Pay % of daily rate for a regular holiday worked. Based on commonly-cited DOLE guidelines - verify against current issuances and adjust if needed.",
+    },
+    {
+      key: "HOLIDAY_REGULAR_UNWORKED_PCT",
+      value: "100",
+      description: "Pay % of daily rate for a regular holiday not worked. Based on commonly-cited DOLE guidelines - verify against current issuances and adjust if needed.",
+    },
+    {
+      key: "HOLIDAY_SPECIAL_NON_WORKING_WORKED_PCT",
+      value: "130",
+      description: "Pay % of daily rate for a special non-working holiday worked. Based on commonly-cited DOLE guidelines - verify against current issuances and adjust if needed.",
+    },
+    {
+      key: "HOLIDAY_SPECIAL_NON_WORKING_UNWORKED_PCT",
+      value: "0",
+      description: "Pay % of daily rate for a special non-working holiday not worked (no work, no pay, unless a favorable company policy/CBA applies). Based on commonly-cited DOLE guidelines - verify against current issuances and adjust if needed.",
+    },
+    {
+      key: "HOLIDAY_SPECIAL_WORKING_PCT",
+      value: "100",
+      description: "Pay % of daily rate for a special working holiday (no premium - treated as an ordinary work day). Based on commonly-cited DOLE guidelines - verify against current issuances and adjust if needed.",
+    },
   ];
   for (const s of settings) {
     await prisma.setting.upsert({ where: { key: s.key }, update: {}, create: s });

@@ -8,6 +8,11 @@ import { logAudit } from "../services/auditLog.service";
 import { notify, notifyAllAdmins } from "../services/notification.service";
 import { upload, uploadToBlob } from "../lib/upload";
 import { startOfDayUTC, isWeekend, findHolidayForDate } from "../services/attendance.service";
+import { stripDailyRate, type Viewer } from "../utils/employeeVisibility";
+
+function viewerFrom(req: any): Viewer {
+  return { role: req.user.role, employeeId: req.user.employeeId };
+}
 
 const router = Router();
 
@@ -87,7 +92,14 @@ router.get(
       include: { employee: { include: { department: true } }, leaveType: true, approvedBy: true },
       orderBy: { createdAt: "desc" },
     });
-    res.json(leaveRequests);
+    const viewer = viewerFrom(req);
+    res.json(
+      leaveRequests.map((lr) => ({
+        ...lr,
+        employee: stripDailyRate(lr.employee, viewer),
+        approvedBy: stripDailyRate(lr.approvedBy, viewer),
+      }))
+    );
   })
 );
 
@@ -109,7 +121,8 @@ router.get(
       },
       include: { employee: true, leaveType: true },
     });
-    res.json(leaveRequests);
+    const viewer = viewerFrom(req);
+    res.json(leaveRequests.map((lr) => ({ ...lr, employee: stripDailyRate(lr.employee, viewer) })));
   })
 );
 

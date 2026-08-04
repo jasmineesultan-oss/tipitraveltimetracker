@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Plus, Search, Pencil, Trash2, Clock, UserX, UserCheck } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Clock, UserX, UserCheck, Wallet } from "lucide-react";
 import { getCoreRowModel, useReactTable, flexRender, createColumnHelper } from "@tanstack/react-table";
 import { api, apiErrorMessage } from "@/lib/api";
-import type { Department, Employee, Gender, Position } from "@/types";
+import type { Department, Employee, Gender, Position, RateHistory } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,9 +14,123 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ManualAttendanceEntryDialog } from "@/components/shared/ManualAttendanceEntryDialog";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatRate } from "@/lib/utils";
 
 const UNSPECIFIED_GENDER = "unspecified";
+
+function UpdateRateDialog({
+  open,
+  onOpenChange,
+  employee,
+  onSaved,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  employee: Employee | null;
+  onSaved: () => void;
+}) {
+  const [newRate, setNewRate] = useState("");
+  const [effectiveDate, setEffectiveDate] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [history, setHistory] = useState<RateHistory[] | null>(null);
+
+  useEffect(() => {
+    if (open && employee) {
+      setNewRate("");
+      setEffectiveDate("");
+      setError(null);
+      setHistory(null);
+      api
+        .get<RateHistory[]>(`/employees/${employee.id}/rate-history`)
+        .then((res) => setHistory(res.data))
+        .catch(() => setHistory([]));
+    }
+  }, [open, employee]);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!employee) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      await api.put(`/employees/${employee.id}/rate`, {
+        newRate: parseFloat(newRate),
+        effectiveDate: effectiveDate || undefined,
+      });
+      onSaved();
+      onOpenChange(false);
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            Update Rate {employee ? `— ${employee.firstName} ${employee.lastName}` : ""}
+          </DialogTitle>
+        </DialogHeader>
+        <form onSubmit={onSubmit} className="space-y-3">
+          {error && <Alert>{error}</Alert>}
+          <div className="space-y-1">
+            <Label>Current Rate</Label>
+            <p className="text-sm text-slate-500">{formatRate(employee?.dailyRate)}</p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <Label>New Rate</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                required
+                value={newRate}
+                onChange={(e) => setNewRate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Effective Date</Label>
+              <Input type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={submitting}>
+              Save Rate
+            </Button>
+          </DialogFooter>
+        </form>
+
+        <div className="space-y-2 border-t border-slate-200 pt-3 dark:border-slate-700">
+          <Label>Rate History</Label>
+          {history === null ? (
+            <p className="text-sm text-slate-400">Loading...</p>
+          ) : history.length === 0 ? (
+            <p className="text-sm text-slate-400">No rate changes recorded yet.</p>
+          ) : (
+            <ul className="max-h-40 space-y-1 overflow-y-auto text-sm">
+              {history.map((h) => (
+                <li key={h.id} className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                  <span>
+                    {formatRate(h.oldRate)} → {formatRate(h.newRate)}
+                  </span>
+                  <span className="text-xs text-slate-400">{formatDate(h.effectiveDate)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 interface EmployeeFormValues {
   employeeCode: string;
@@ -246,6 +360,8 @@ export default function EmployeesPage() {
   const [error, setError] = useState<string | null>(null);
   const [logAttendanceOpen, setLogAttendanceOpen] = useState(false);
   const [logAttendanceEmployeeId, setLogAttendanceEmployeeId] = useState<string | null>(null);
+  const [rateDialogOpen, setRateDialogOpen] = useState(false);
+  const [rateEmployee, setRateEmployee] = useState<Employee | null>(null);
 
   async function load() {
     const [empRes, deptRes, posRes] = await Promise.all([
@@ -327,10 +443,26 @@ export default function EmployeesPage() {
         ),
       }),
       columnHelper.display({
+        id: "dailyRate",
+        header: "Rate",
+        cell: (info) => formatRate(info.row.original.dailyRate),
+      }),
+      columnHelper.display({
         id: "actions",
         header: "",
         cell: (info) => (
           <div className="flex justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Update Rate"
+              onClick={() => {
+                setRateEmployee(info.row.original);
+                setRateDialogOpen(true);
+              }}
+            >
+              <Wallet className="h-4 w-4" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -445,6 +577,8 @@ export default function EmployeesPage() {
         onSaved={load}
         preselectedEmployeeId={logAttendanceEmployeeId ?? undefined}
       />
+
+      <UpdateRateDialog open={rateDialogOpen} onOpenChange={setRateDialogOpen} employee={rateEmployee} onSaved={load} />
     </div>
   );
 }

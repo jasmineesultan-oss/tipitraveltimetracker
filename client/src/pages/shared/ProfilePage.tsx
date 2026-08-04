@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/shared/Alert";
 import { PageSpinner } from "@/components/shared/Spinner";
-import { initials } from "@/lib/utils";
+import { initials, formatRate } from "@/lib/utils";
 
 function ProfileForm({ employee, onSaved }: { employee: Employee; onSaved: () => void }) {
   const { register, handleSubmit, formState } = useForm<{ phone?: string }>({
@@ -158,6 +158,18 @@ export default function ProfilePage() {
               refreshUser();
             }}
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>My Rate</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-1">
+            <Label>Daily Rate</Label>
+            <p className="text-lg font-semibold text-slate-900">{formatRate(employee.dailyRate)}</p>
+          </div>
         </CardContent>
       </Card>
 

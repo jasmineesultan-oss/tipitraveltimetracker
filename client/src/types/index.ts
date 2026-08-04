@@ -55,6 +55,17 @@ export interface Employee {
   isActive?: boolean;
   hasAccount?: boolean;
   temporaryPassword?: string;
+  dailyRate?: number | null;
+}
+
+export interface RateHistory {
+  id: string;
+  employeeId: string;
+  oldRate?: number | null;
+  newRate: number;
+  changedBy: string;
+  effectiveDate: string;
+  createdAt: string;
 }
 
 export interface AuthUser {

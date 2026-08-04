@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { asyncHandler } from "../middleware/errorHandler";
 import { exportReport, ExportColumn } from "../utils/export";
+import { computeHolidayPay } from "../services/payroll.service";
 
 const router = Router();
 
@@ -160,7 +161,12 @@ const payrollColumns: ExportColumn[] = [
   { header: "Undertime (min)", key: "undertimeMinutes", width: 12 },
   { header: "Absences", key: "absences", width: 10 },
   { header: "Approved Leave Days", key: "leaveDays", width: 15 },
+  { header: "Daily Rate", key: "dailyRate", width: 12 },
+  { header: "Holiday Pay (Est.)", key: "holidayPay", width: 15 },
 ];
+
+const PAYROLL_ESTIMATE_NOTE =
+  "Holiday pay figures are estimates based on configured percentages and should be verified before use in actual payroll.";
 
 router.get(
   "/payroll-summary",
@@ -185,6 +191,12 @@ router.get(
         const absences = attendances.filter((a) => a.status === "ABSENT").length;
         const leaveDays = attendances.filter((a) => a.status === "ON_LEAVE").length;
 
+        const holidayAttendances = attendances.filter((a) => a.holidayType !== null);
+        const holidayPayAmounts = await Promise.all(
+          holidayAttendances.map((a) => computeHolidayPay(emp.id, a.date, a.holidayType, a.totalHours > 0))
+        );
+        const holidayPay = holidayPayAmounts.reduce((s: number, v) => s + (v || 0), 0);
+
         return {
           employeeCode: emp.employeeCode,
           name: `${emp.firstName} ${emp.lastName}`,
@@ -195,11 +207,13 @@ router.get(
           undertimeMinutes,
           absences,
           leaveDays,
+          dailyRate: emp.dailyRate ?? "",
+          holidayPay: Math.round(holidayPay * 100) / 100,
         };
       })
     );
 
-    await exportReport(res, format || "csv", "payroll-summary", "Payroll Summary Report", payrollColumns, rows);
+    await exportReport(res, format || "csv", "payroll-summary", "Payroll Summary Report", payrollColumns, rows, PAYROLL_ESTIMATE_NOTE);
   })
 );
 

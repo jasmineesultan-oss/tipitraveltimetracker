@@ -7,6 +7,7 @@ import { signToken } from "../utils/jwt";
 import { asyncHandler, ApiError } from "../middleware/errorHandler";
 import { requireAuth } from "../middleware/auth";
 import { logAudit } from "../services/auditLog.service";
+import { stripDailyRate } from "../utils/employeeVisibility";
 
 const router = Router();
 
@@ -144,6 +145,10 @@ router.get(
     });
     if (!user) throw new ApiError(404, "User not found");
     const { passwordHash, resetToken, resetTokenExpiry, ...safeUser } = user;
+    const viewer = { role: req.user!.role, employeeId: req.user!.employeeId };
+    if (safeUser.employee?.manager) {
+      (safeUser.employee as any).manager = stripDailyRate(safeUser.employee.manager, viewer);
+    }
     res.json(safeUser);
   })
 );

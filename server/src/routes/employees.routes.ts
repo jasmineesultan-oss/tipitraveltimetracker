@@ -5,13 +5,23 @@ import { prisma } from "../lib/prisma";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { asyncHandler, ApiError } from "../middleware/errorHandler";
 import { logAudit } from "../services/auditLog.service";
+import { notify } from "../services/notification.service";
+import { stripDailyRate, type Viewer } from "../utils/employeeVisibility";
 
 const router = Router();
 
-function safeEmployee(employee: any) {
+function viewerFrom(req: any): Viewer {
+  return { role: req.user.role, employeeId: req.user.employeeId };
+}
+
+function safeEmployee(employee: any, viewer: Viewer) {
   if (!employee) return employee;
-  const { user, ...rest } = employee;
-  return { ...rest, email: rest.email, hasAccount: !!user, role: user?.role, isActive: user?.isActive };
+  const { user, manager, ...rest } = employee;
+  const base = { ...rest, email: rest.email, hasAccount: !!user, role: user?.role, isActive: user?.isActive };
+  return {
+    ...stripDailyRate(base, viewer),
+    manager: manager ? stripDailyRate(manager, viewer) : manager,
+  };
 }
 
 router.get(
@@ -36,7 +46,8 @@ router.get(
       include: { department: true, position: true, manager: true, user: true },
       orderBy: { createdAt: "desc" },
     });
-    res.json(employees.map(safeEmployee));
+    const viewer = viewerFrom(req);
+    res.json(employees.map((e) => safeEmployee(e, viewer)));
   })
 );
 
@@ -52,7 +63,7 @@ router.get(
       include: { department: true, position: true, manager: true, user: true },
     });
     if (!employee) throw new ApiError(404, "Employee not found");
-    res.json(safeEmployee(employee));
+    res.json(safeEmployee(employee, viewerFrom(req)));
   })
 );
 
@@ -127,7 +138,7 @@ router.post(
     }, { timeout: 15000 });
 
     await logAudit({ userId: req.user!.userId, action: "ADMIN_ACTION", entityType: "Employee", entityId: employee.id, details: "Created employee", ipAddress: req.ip });
-    res.status(201).json({ ...safeEmployee(employee), temporaryPassword: data.password ? undefined : tempPassword });
+    res.status(201).json({ ...safeEmployee(employee, viewerFrom(req)), temporaryPassword: data.password ? undefined : tempPassword });
   })
 );
 
@@ -167,7 +178,7 @@ router.put(
       include: { department: true, position: true, manager: true, user: true },
     });
     await logAudit({ userId: req.user!.userId, action: "ADMIN_ACTION", entityType: "Employee", entityId: employee.id, details: "Updated employee", ipAddress: req.ip });
-    res.json(safeEmployee(employee));
+    res.json(safeEmployee(employee, viewerFrom(req)));
   })
 );
 
@@ -185,7 +196,7 @@ router.put(
       include: { department: true, position: true, manager: true, user: true },
     });
     await logAudit({ userId: req.user!.userId, action: "ADMIN_ACTION", entityType: "Employee", entityId: employee.id, details: "Deactivated employee", ipAddress: req.ip });
-    res.json(safeEmployee(employee));
+    res.json(safeEmployee(employee, viewerFrom(req)));
   })
 );
 
@@ -203,7 +214,7 @@ router.put(
       include: { department: true, position: true, manager: true, user: true },
     });
     await logAudit({ userId: req.user!.userId, action: "ADMIN_ACTION", entityType: "Employee", entityId: employee.id, details: "Reactivated employee", ipAddress: req.ip });
-    res.json(safeEmployee(employee));
+    res.json(safeEmployee(employee, viewerFrom(req)));
   })
 );
 
@@ -239,7 +250,80 @@ router.put(
       include: { department: true, position: true, manager: true, user: true },
     });
     await logAudit({ userId: req.user!.userId, action: "PROFILE_UPDATED", entityType: "Employee", entityId: employee.id, ipAddress: req.ip });
-    res.json(safeEmployee(employee));
+    res.json(safeEmployee(employee, viewerFrom(req)));
+  })
+);
+
+const updateRateSchema = z.object({
+  newRate: z.number().positive(),
+  effectiveDate: z.string().optional(),
+});
+
+router.put(
+  "/:id/rate",
+  requireAuth,
+  requireRole("ADMIN"),
+  asyncHandler(async (req, res) => {
+    const data = updateRateSchema.parse(req.body);
+    const employee = await prisma.employee.findUnique({ where: { id: req.params.id } });
+    if (!employee) throw new ApiError(404, "Employee not found");
+
+    const oldRate = employee.dailyRate;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const emp = await tx.employee.update({
+        where: { id: req.params.id },
+        data: { dailyRate: data.newRate },
+        include: { department: true, position: true, manager: true, user: true },
+      });
+      await tx.rateHistory.create({
+        data: {
+          employeeId: req.params.id,
+          oldRate,
+          newRate: data.newRate,
+          changedBy: req.user!.userId,
+          effectiveDate: data.effectiveDate ? new Date(data.effectiveDate) : new Date(),
+        },
+      });
+      return emp;
+    });
+
+    if (oldRate !== null && data.newRate > oldRate) {
+      await notify({
+        userId: employee.userId,
+        type: "GENERAL",
+        title: "Rate Updated",
+        message: "Your daily rate has been updated. Check your profile for details.",
+        relatedEntityType: "Employee",
+        relatedEntityId: employee.id,
+      });
+    }
+
+    await logAudit({
+      userId: req.user!.userId,
+      action: "ADMIN_ACTION",
+      entityType: "Employee",
+      entityId: employee.id,
+      details: `Updated rate for ${employee.firstName} ${employee.lastName}`,
+      ipAddress: req.ip,
+    });
+
+    res.json(safeEmployee(updated, viewerFrom(req)));
+  })
+);
+
+router.get(
+  "/:id/rate-history",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    if (req.user!.role !== "ADMIN" && req.user!.employeeId !== req.params.id) {
+      throw new ApiError(403, "Forbidden");
+    }
+    const history = await prisma.rateHistory.findMany({
+      where: { employeeId: req.params.id },
+      orderBy: { effectiveDate: "desc" },
+    });
+    res.json(history);
   })
 );
 

@@ -23,6 +23,11 @@ export function formatMinutes(minutes: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
+export function formatRate(rate: number | null | undefined): string {
+  if (rate === null || rate === undefined) return "—";
+  return `₱${rate.toFixed(2)}`;
+}
+
 export function initials(firstName?: string, lastName?: string): string {
   return `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
 }
