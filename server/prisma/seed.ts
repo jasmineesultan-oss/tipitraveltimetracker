@@ -171,6 +171,11 @@ async function main() {
       value: "100",
       description: "Pay % of daily rate for a special working holiday (no premium - treated as an ordinary work day). Based on commonly-cited DOLE guidelines - verify against current issuances and adjust if needed.",
     },
+    {
+      key: "OVERTIME_PCT",
+      value: "125",
+      description: "Pay % of hourly rate for each overtime hour worked, reflecting the standard PH overtime premium (25% on top of the hourly rate). Based on commonly-cited DOLE guidelines - verify against current issuances and adjust if needed.",
+    },
   ];
   for (const s of settings) {
     await prisma.setting.upsert({ where: { key: s.key }, update: {}, create: s });

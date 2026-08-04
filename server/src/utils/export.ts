@@ -97,3 +97,124 @@ export async function exportReport(
   if (format === "pdf") return exportPdf(res, filename, title, columns, rows, note);
   return exportCsv(res, filename, columns, rows, note);
 }
+
+const PAYROLL_XLSX_COLUMNS = [
+  { header: "Date", width: 14 },
+  { header: "Employee Code", width: 15 },
+  { header: "Name", width: 22 },
+  { header: "Hours Worked", width: 12 },
+  { header: "Payable Hours", width: 12 },
+  { header: "Hourly Rate", width: 12 },
+  { header: "Holiday Type", width: 16 },
+  { header: "Multiplier %", width: 12 },
+  { header: "Base Amount", width: 14 },
+  { header: "Overtime Hours", width: 12 },
+  { header: "Overtime Pay", width: 14 },
+  { header: "Day Total", width: 14 },
+];
+
+export interface PayrollDayRow {
+  date: Date;
+  hoursWorked: number;
+  payableHours: number;
+  hourlyRate: number | null;
+  holidayType: string | null;
+  multiplierPct: number | null;
+  baseAmount: number | null;
+  overtimeHours: number;
+  overtimePct: number | null;
+  overtimePay: number | null;
+  dayTotal: number | null;
+  note?: string;
+}
+
+export interface PayrollEmployeeRows {
+  employeeCode: string;
+  name: string;
+  days: PayrollDayRow[];
+  periodTotal: number;
+}
+
+/**
+ * Unlike exportXlsx, this writes real Excel formula cells for Base Amount, Overtime
+ * Pay, and Day Total - referencing the other columns in that row - so opening the
+ * file shows and recalculates the actual computation rather than a static number.
+ */
+export async function exportPayrollXlsx(
+  res: Response,
+  filename: string,
+  employees: PayrollEmployeeRows[],
+  note?: string
+) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Payroll");
+  PAYROLL_XLSX_COLUMNS.forEach((c, i) => {
+    sheet.getColumn(i + 1).width = c.width;
+  });
+
+  let headerRowNum = 1;
+  if (note) {
+    sheet.mergeCells(1, 1, 1, PAYROLL_XLSX_COLUMNS.length);
+    const noteCell = sheet.getCell(1, 1);
+    noteCell.value = note;
+    noteCell.font = { italic: true, color: { argb: "FF666666" } };
+    headerRowNum = 2;
+  }
+  const headerRow = sheet.getRow(headerRowNum);
+  PAYROLL_XLSX_COLUMNS.forEach((c, i) => {
+    headerRow.getCell(i + 1).value = c.header;
+  });
+  headerRow.font = { bold: true };
+
+  let rowNum = headerRowNum + 1;
+
+  for (const emp of employees) {
+    const startRow = rowNum;
+    for (const d of emp.days) {
+      const row = sheet.getRow(rowNum);
+      row.getCell(1).value = d.date.toISOString().slice(0, 10);
+      row.getCell(2).value = emp.employeeCode;
+      row.getCell(3).value = emp.name;
+      row.getCell(4).value = d.hoursWorked;
+      row.getCell(5).value = d.payableHours;
+      row.getCell(7).value = d.holidayType || "—";
+      row.getCell(10).value = d.overtimeHours;
+
+      if (d.hourlyRate === null) {
+        row.getCell(6).value = d.note || "N/A";
+        row.getCell(8).value = "N/A";
+        row.getCell(9).value = "N/A";
+        row.getCell(11).value = "N/A";
+        row.getCell(12).value = "N/A";
+      } else {
+        row.getCell(6).value = d.hourlyRate;
+        row.getCell(8).value = d.multiplierPct ?? "";
+        row.getCell(9).value = { formula: `D${rowNum}*F${rowNum}` } as any;
+        const otMultiplier = (d.overtimePct ?? 125) / 100;
+        row.getCell(11).value = { formula: `J${rowNum}*F${rowNum}*${otMultiplier}` } as any;
+        row.getCell(12).value = {
+          formula: `IF(G${rowNum}="—",I${rowNum}+K${rowNum},E${rowNum}*F${rowNum}*H${rowNum}/100)`,
+        } as any;
+      }
+      row.commit();
+      rowNum++;
+    }
+
+    const totalRow = sheet.getRow(rowNum);
+    totalRow.getCell(3).value = `${emp.name} - Period Total`;
+    totalRow.getCell(3).font = { bold: true };
+    if (rowNum > startRow) {
+      totalRow.getCell(12).value = { formula: `SUM(L${startRow}:L${rowNum - 1})` } as any;
+    } else {
+      totalRow.getCell(12).value = 0;
+    }
+    totalRow.getCell(12).font = { bold: true };
+    totalRow.commit();
+    rowNum++;
+  }
+
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}.xlsx"`);
+  await workbook.xlsx.write(res);
+  res.end();
+}

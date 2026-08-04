@@ -13,6 +13,7 @@ import LeaveRequestsPage from "@/pages/admin/LeaveRequestsPage";
 import EmployeesPage from "@/pages/admin/EmployeesPage";
 import DepartmentsPage from "@/pages/admin/DepartmentsPage";
 import HolidaysPage from "@/pages/admin/HolidaysPage";
+import PayrollPage from "@/pages/admin/PayrollPage";
 import ReportsPage from "@/pages/admin/ReportsPage";
 import AuditLogsPage from "@/pages/admin/AuditLogsPage";
 import SettingsPage from "@/pages/admin/SettingsPage";
@@ -47,6 +48,7 @@ function App() {
                 <Route path="/employees" element={<EmployeesPage />} />
                 <Route path="/departments" element={<DepartmentsPage />} />
                 <Route path="/holidays" element={<HolidaysPage />} />
+                <Route path="/payroll" element={<PayrollPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
                 <Route path="/audit-logs" element={<AuditLogsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />

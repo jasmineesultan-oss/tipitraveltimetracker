@@ -192,3 +192,34 @@ export interface Setting {
   value: string;
   description?: string | null;
 }
+
+export interface PayrollDayBreakdown {
+  date: string;
+  hoursWorked: number;
+  payableHours: number;
+  hourlyRate: number | null;
+  isHoliday: boolean;
+  holidayType: HolidayType | null;
+  multiplierPct: number | null;
+  baseAmount: number | null;
+  holidayPay: number | null;
+  overtimeHours: number;
+  overtimePct: number | null;
+  overtimePay: number | null;
+  dayTotal: number | null;
+  note?: string;
+}
+
+export interface EmployeePayrollBreakdown {
+  employeeId: string;
+  employeeCode: string;
+  name: string;
+  department: string;
+  days: PayrollDayBreakdown[];
+  periodTotal: number;
+}
+
+export interface PayrollBreakdownResponse {
+  employees: EmployeePayrollBreakdown[];
+  grandTotal: number;
+}

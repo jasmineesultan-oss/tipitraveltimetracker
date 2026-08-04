@@ -11,6 +11,7 @@ import {
   Settings,
   UserCircle,
   Clock4,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 
@@ -32,6 +33,7 @@ export const adminLinks: NavLinkItem[] = [
   { to: "/employees", label: "Employees", icon: Users },
   { to: "/departments", label: "Departments", icon: Building2 },
   { to: "/holidays", label: "Holidays", icon: PartyPopper },
+  { to: "/payroll", label: "Payroll", icon: Wallet },
   { to: "/reports", label: "Reports", icon: FileBarChart },
   { to: "/audit-logs", label: "Audit Logs", icon: ScrollText },
   { to: "/settings", label: "Settings", icon: Settings },
