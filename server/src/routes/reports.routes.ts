@@ -161,7 +161,7 @@ const payrollColumns: ExportColumn[] = [
   { header: "Undertime (min)", key: "undertimeMinutes", width: 12 },
   { header: "Absences", key: "absences", width: 10 },
   { header: "Approved Leave Days", key: "leaveDays", width: 15 },
-  { header: "Daily Rate", key: "dailyRate", width: 12 },
+  { header: "Hourly Rate", key: "hourlyRate", width: 12 },
   { header: "Holiday Pay (Est.)", key: "holidayPay", width: 15 },
 ];
 
@@ -193,7 +193,7 @@ router.get(
 
         const holidayAttendances = attendances.filter((a) => a.holidayType !== null);
         const holidayPayAmounts = await Promise.all(
-          holidayAttendances.map((a) => computeHolidayPay(emp.id, a.date, a.holidayType, a.totalHours > 0))
+          holidayAttendances.map((a) => computeHolidayPay(emp.id, a.date, a.holidayType, a.totalHours))
         );
         const holidayPay = holidayPayAmounts.reduce((s: number, v) => s + (v || 0), 0);
 
@@ -207,7 +207,7 @@ router.get(
           undertimeMinutes,
           absences,
           leaveDays,
-          dailyRate: emp.dailyRate ?? "",
+          hourlyRate: emp.hourlyRate ?? "",
           holidayPay: Math.round(holidayPay * 100) / 100,
         };
       })

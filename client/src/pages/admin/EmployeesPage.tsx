@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { Plus, Search, Pencil, Trash2, Clock, UserX, UserCheck, Wallet } from "lucide-react";
 import { getCoreRowModel, useReactTable, flexRender, createColumnHelper } from "@tanstack/react-table";
 import { api, apiErrorMessage } from "@/lib/api";
-import type { Department, Employee, Gender, Position, RateHistory } from "@/types";
+import type { Department, Employee, EmploymentType, Gender, Position, RateHistory } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -79,7 +79,7 @@ function UpdateRateDialog({
           {error && <Alert>{error}</Alert>}
           <div className="space-y-1">
             <Label>Current Rate</Label>
-            <p className="text-sm text-slate-500">{formatRate(employee?.dailyRate)}</p>
+            <p className="text-sm text-slate-500">{formatRate(employee?.hourlyRate)}</p>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1">
@@ -145,6 +145,7 @@ interface EmployeeFormValues {
   scheduledStartTime?: string;
   scheduledEndTime?: string;
   gender?: Gender | typeof UNSPECIFIED_GENDER;
+  employmentType: EmploymentType;
 }
 
 function EmployeeFormDialog({
@@ -185,8 +186,9 @@ function EmployeeFormDialog({
               scheduledStartTime: employee.scheduledStartTime || "",
               scheduledEndTime: employee.scheduledEndTime || "",
               gender: employee.gender || UNSPECIFIED_GENDER,
+              employmentType: employee.employmentType || "REGULAR",
             }
-          : { role: "EMPLOYEE", gender: UNSPECIFIED_GENDER }
+          : { role: "EMPLOYEE", gender: UNSPECIFIED_GENDER, employmentType: "REGULAR" }
       );
     }
   }, [open, employee, reset]);
@@ -290,6 +292,23 @@ function EmployeeFormDialog({
                     <SelectItem value={UNSPECIFIED_GENDER}>Not specified</SelectItem>
                     <SelectItem value="MALE">Male</SelectItem>
                     <SelectItem value="FEMALE">Female</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Employment Type</Label>
+                <Select
+                  value={watch("employmentType")}
+                  onValueChange={(v) => setValue("employmentType", v as EmploymentType)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="REGULAR">Regular</SelectItem>
+                    <SelectItem value="INTERN">Intern</SelectItem>
+                    <SelectItem value="CONTRACTUAL">Contractual</SelectItem>
+                    <SelectItem value="PROBATIONARY">Probationary</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -443,26 +462,28 @@ export default function EmployeesPage() {
         ),
       }),
       columnHelper.display({
-        id: "dailyRate",
+        id: "hourlyRate",
         header: "Rate",
-        cell: (info) => formatRate(info.row.original.dailyRate),
+        cell: (info) => (info.row.original.employmentType === "INTERN" ? "N/A" : formatRate(info.row.original.hourlyRate)),
       }),
       columnHelper.display({
         id: "actions",
         header: "",
         cell: (info) => (
           <div className="flex justify-end gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              title="Update Rate"
-              onClick={() => {
-                setRateEmployee(info.row.original);
-                setRateDialogOpen(true);
-              }}
-            >
-              <Wallet className="h-4 w-4" />
-            </Button>
+            {info.row.original.employmentType !== "INTERN" && (
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Update Rate"
+                onClick={() => {
+                  setRateEmployee(info.row.original);
+                  setRateDialogOpen(true);
+                }}
+              >
+                <Wallet className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"

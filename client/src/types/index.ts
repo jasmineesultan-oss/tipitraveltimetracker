@@ -1,5 +1,6 @@
 export type Role = "ADMIN" | "EMPLOYEE";
 export type EmployeeStatus = "ACTIVE" | "INACTIVE" | "TERMINATED" | "ON_LEAVE";
+export type EmploymentType = "REGULAR" | "INTERN" | "CONTRACTUAL" | "PROBATIONARY";
 export type AttendanceStatus = "PRESENT" | "ABSENT" | "HALF_DAY" | "ON_LEAVE" | "HOLIDAY" | "WEEKEND";
 export type HolidayType = "REGULAR" | "SPECIAL_NON_WORKING" | "SPECIAL_WORKING" | "LOCAL";
 export type WorkType = "OFFICE" | "WORK_FROM_HOME" | "FIELD_WORK";
@@ -45,6 +46,7 @@ export interface Employee {
   position?: Position | null;
   hireDate?: string | null;
   status: EmployeeStatus;
+  employmentType: EmploymentType;
   gender?: Gender | null;
   scheduledStartTime?: string | null;
   scheduledEndTime?: string | null;
@@ -55,14 +57,14 @@ export interface Employee {
   isActive?: boolean;
   hasAccount?: boolean;
   temporaryPassword?: string;
-  dailyRate?: number | null;
+  hourlyRate?: number | null;
 }
 
 export interface RateHistory {
   id: string;
   employeeId: string;
   oldRate?: number | null;
-  newRate: number;
+  newRate?: number | null;
   changedBy: string;
   effectiveDate: string;
   createdAt: string;

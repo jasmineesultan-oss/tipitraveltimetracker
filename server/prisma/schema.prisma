@@ -67,6 +67,13 @@ enum NotificationType {
   GENERAL
 }
 
+enum EmploymentType {
+  REGULAR
+  INTERN
+  CONTRACTUAL
+  PROBATIONARY
+}
+
 enum AuditAction {
   LOGIN
   LOGOUT
@@ -144,6 +151,7 @@ model Employee {
   position        Position?      @relation(fields: [positionId], references: [id], onDelete: SetNull)
   hireDate        DateTime?
   status          EmployeeStatus @default(ACTIVE)
+  employmentType  EmploymentType @default(REGULAR)
   gender          Gender?
   scheduledStartTime String?
   scheduledEndTime   String?
@@ -151,7 +159,7 @@ model Employee {
   manager         Employee?      @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
   subordinates    Employee[]     @relation("EmployeeManager")
   profilePicture  String?
-  dailyRate       Float?
+  hourlyRate      Float?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
@@ -169,7 +177,7 @@ model RateHistory {
   employeeId     String
   employee       Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   oldRate        Float?
-  newRate        Float
+  newRate        Float?
   changedBy      String
   effectiveDate  DateTime @default(now())
   createdAt      DateTime @default(now())

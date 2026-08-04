@@ -6,7 +6,7 @@ import { asyncHandler, ApiError } from "../middleware/errorHandler";
 import { computeTimeIn, computeDayAggregate, startOfDayUTC, toPhShifted } from "../services/attendance.service";
 import { logAudit } from "../services/auditLog.service";
 import { notifyAllAdmins, notify } from "../services/notification.service";
-import { stripDailyRate } from "../utils/employeeVisibility";
+import { stripHourlyRate } from "../utils/employeeVisibility";
 
 const router = Router();
 
@@ -202,7 +202,7 @@ router.get(
       orderBy: { date: "desc" },
     });
     const viewer = { role: req.user!.role, employeeId: req.user!.employeeId };
-    res.json(attendances.map((a) => ({ ...a, employee: stripDailyRate(a.employee, viewer) })));
+    res.json(attendances.map((a) => ({ ...a, employee: stripHourlyRate(a.employee, viewer) })));
   })
 );
 

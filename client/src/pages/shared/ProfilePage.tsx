@@ -167,8 +167,10 @@ export default function ProfilePage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-1">
-            <Label>Daily Rate</Label>
-            <p className="text-lg font-semibold text-slate-900">{formatRate(employee.dailyRate)}</p>
+            <Label>Hourly Rate</Label>
+            <p className="text-lg font-semibold text-slate-900">
+              {employee.employmentType === "INTERN" ? "Not applicable" : formatRate(employee.hourlyRate)}
+            </p>
           </div>
         </CardContent>
       </Card>

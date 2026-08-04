@@ -6,7 +6,7 @@ import { requireAuth, requireRole } from "../middleware/auth";
 import { asyncHandler, ApiError } from "../middleware/errorHandler";
 import { logAudit } from "../services/auditLog.service";
 import { notify } from "../services/notification.service";
-import { stripDailyRate, type Viewer } from "../utils/employeeVisibility";
+import { stripHourlyRate, type Viewer } from "../utils/employeeVisibility";
 
 const router = Router();
 
@@ -19,8 +19,8 @@ function safeEmployee(employee: any, viewer: Viewer) {
   const { user, manager, ...rest } = employee;
   const base = { ...rest, email: rest.email, hasAccount: !!user, role: user?.role, isActive: user?.isActive };
   return {
-    ...stripDailyRate(base, viewer),
-    manager: manager ? stripDailyRate(manager, viewer) : manager,
+    ...stripHourlyRate(base, viewer),
+    manager: manager ? stripHourlyRate(manager, viewer) : manager,
   };
 }
 
@@ -82,6 +82,7 @@ const createEmployeeSchema = z.object({
   scheduledStartTime: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
   scheduledEndTime: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
   gender: z.enum(["MALE", "FEMALE"]).optional().nullable(),
+  employmentType: z.enum(["REGULAR", "INTERN", "CONTRACTUAL", "PROBATIONARY"]).optional(),
 });
 
 router.post(
@@ -115,6 +116,7 @@ router.post(
           scheduledStartTime: data.scheduledStartTime,
           scheduledEndTime: data.scheduledEndTime,
           gender: data.gender,
+          employmentType: data.employmentType,
         },
         include: { department: true, position: true, manager: true, user: true },
       });
@@ -156,6 +158,7 @@ const updateEmployeeSchema = z.object({
   scheduledStartTime: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
   scheduledEndTime: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
   gender: z.enum(["MALE", "FEMALE"]).optional().nullable(),
+  employmentType: z.enum(["REGULAR", "INTERN", "CONTRACTUAL", "PROBATIONARY"]).optional(),
 });
 
 router.put(
@@ -172,10 +175,33 @@ router.put(
       if (conflict) throw new ApiError(400, "Employee code already in use");
     }
 
-    const employee = await prisma.employee.update({
-      where: { id: req.params.id },
-      data: { ...data, hireDate: data.hireDate ? new Date(data.hireDate) : undefined },
-      include: { department: true, position: true, manager: true, user: true },
+    const existing = await prisma.employee.findUnique({ where: { id: req.params.id } });
+    if (!existing) throw new ApiError(404, "Employee not found");
+    const becomingIntern = data.employmentType === "INTERN" && existing.employmentType !== "INTERN";
+    const clearingRate = becomingIntern && existing.hourlyRate !== null;
+
+    const employee = await prisma.$transaction(async (tx) => {
+      const emp = await tx.employee.update({
+        where: { id: req.params.id },
+        data: {
+          ...data,
+          hireDate: data.hireDate ? new Date(data.hireDate) : undefined,
+          hourlyRate: clearingRate ? null : undefined,
+        },
+        include: { department: true, position: true, manager: true, user: true },
+      });
+      if (clearingRate) {
+        await tx.rateHistory.create({
+          data: {
+            employeeId: req.params.id,
+            oldRate: existing.hourlyRate,
+            newRate: null,
+            changedBy: req.user!.userId,
+            effectiveDate: new Date(),
+          },
+        });
+      }
+      return emp;
     });
     await logAudit({ userId: req.user!.userId, action: "ADMIN_ACTION", entityType: "Employee", entityId: employee.id, details: "Updated employee", ipAddress: req.ip });
     res.json(safeEmployee(employee, viewerFrom(req)));
@@ -267,13 +293,16 @@ router.put(
     const data = updateRateSchema.parse(req.body);
     const employee = await prisma.employee.findUnique({ where: { id: req.params.id } });
     if (!employee) throw new ApiError(404, "Employee not found");
+    if (employee.employmentType === "INTERN") {
+      throw new ApiError(400, "Interns are not eligible for a pay rate");
+    }
 
-    const oldRate = employee.dailyRate;
+    const oldRate = employee.hourlyRate;
 
     const updated = await prisma.$transaction(async (tx) => {
       const emp = await tx.employee.update({
         where: { id: req.params.id },
-        data: { dailyRate: data.newRate },
+        data: { hourlyRate: data.newRate },
         include: { department: true, position: true, manager: true, user: true },
       });
       await tx.rateHistory.create({
@@ -293,7 +322,7 @@ router.put(
         userId: employee.userId,
         type: "GENERAL",
         title: "Rate Updated",
-        message: "Your daily rate has been updated. Check your profile for details.",
+        message: "Your hourly rate has been updated. Check your profile for details.",
         relatedEntityType: "Employee",
         relatedEntityId: employee.id,
       });

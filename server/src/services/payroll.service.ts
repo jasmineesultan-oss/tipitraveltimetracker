@@ -3,9 +3,9 @@ import { prisma } from "../lib/prisma";
 import { getSetting } from "./settings.service";
 
 /**
- * Resolves the daily rate that was in effect on `date`: the most recent
+ * Resolves the hourly rate that was in effect on `date`: the most recent
  * RateHistory row whose effectiveDate is on or before that date, falling back to
- * the employee's current dailyRate if no history exists for that period yet
+ * the employee's current hourlyRate if no history exists for that period yet
  * (e.g. their very first rate, recorded before RateHistory tracking applies to it).
  */
 async function resolveRateForDate(employeeId: string, date: Date): Promise<number | null> {
@@ -15,8 +15,8 @@ async function resolveRateForDate(employeeId: string, date: Date): Promise<numbe
   });
   if (historyRow) return historyRow.newRate;
 
-  const employee = await prisma.employee.findUnique({ where: { id: employeeId }, select: { dailyRate: true } });
-  return employee?.dailyRate ?? null;
+  const employee = await prisma.employee.findUnique({ where: { id: employeeId }, select: { hourlyRate: true } });
+  return employee?.hourlyRate ?? null;
 }
 
 /**
@@ -45,21 +45,33 @@ async function holidayPayPercent(holidayType: HolidayType, workedThatDay: boolea
 
 /**
  * Estimated peso holiday pay for one day, or null if the day wasn't a holiday
- * or the employee has no dailyRate on record for the relevant period. Figures
+ * or the employee has no hourlyRate on record for the relevant period. Figures
  * are estimates based on configured Settings percentages - verify before use
  * in actual payroll.
+ *
+ * The stored rate is now hourly, so the day's pay is hourlyRate * hoursForThatDay
+ * * (percentage / 100), where hoursForThatDay is the day's actual worked hours
+ * when the holiday was worked, or the employee's standard/scheduled daily hours
+ * when it wasn't (they're paid as if they worked a normal day).
  */
 export async function computeHolidayPay(
   employeeId: string,
   date: Date,
   holidayType: HolidayType | null,
-  workedThatDay: boolean
+  totalHoursWorked: number
 ): Promise<number | null> {
   if (!holidayType) return null;
 
   const rate = await resolveRateForDate(employeeId, date);
   if (rate === null) return null;
 
+  const workedThatDay = totalHoursWorked > 0;
   const pct = await holidayPayPercent(holidayType, workedThatDay);
-  return Math.round(rate * (pct / 100) * 100) / 100;
+
+  let hoursForThatDay = totalHoursWorked;
+  if (!workedThatDay) {
+    hoursForThatDay = parseFloat(await getSetting("STANDARD_WORK_HOURS", "8"));
+  }
+
+  return Math.round(rate * hoursForThatDay * (pct / 100) * 100) / 100;
 }

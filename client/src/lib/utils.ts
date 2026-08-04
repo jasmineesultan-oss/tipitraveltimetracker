@@ -25,7 +25,7 @@ export function formatMinutes(minutes: number): string {
 
 export function formatRate(rate: number | null | undefined): string {
   if (rate === null || rate === undefined) return "—";
-  return `₱${rate.toFixed(2)}`;
+  return `₱${rate.toFixed(2)}/hr`;
 }
 
 export function initials(firstName?: string, lastName?: string): string {
